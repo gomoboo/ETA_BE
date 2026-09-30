@@ -107,3 +107,60 @@ class LeaveResponse(BaseModel):
 
     join_status: str
     message: str
+
+
+class HomeAppointmentItem(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    title: str
+    meet_at: datetime
+    target_place_name: str
+    is_location_sharing_active: bool
+    participant_count: int
+
+
+class HomeAppointmentsResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    active_appointments: list[HomeAppointmentItem]
+    upcoming_appointments: list[HomeAppointmentItem]
+
+
+class TargetPlace(BaseModel):
+    name: str
+    address: Optional[str]
+    latitude: float
+    longitude: float
+
+
+class PenaltyInfo(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    type: str
+    content: Optional[str]
+    fine_per_minute: int
+
+
+class ParticipantItem(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    participant_id: int
+    nickname: str
+    is_host: bool
+    is_ready: bool
+    join_status: str
+
+
+class AppointmentDetailResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    title: str
+    meet_at: datetime
+    radar_start_at: datetime
+    remaining_seconds_to_radar: int
+    target_place: TargetPlace
+    penalty: PenaltyInfo
+    invite_url: str
+    participants: list[ParticipantItem]
