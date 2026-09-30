@@ -22,10 +22,11 @@ RADAR_MINUTES_BEFORE = {
 }
 
 
-def calculate_radar_minutes(request: AppointmentCreateRequest) -> int:
-    if request.radar_start_type == RadarStartType.CUSTOM:
-        return request.custom_radar_minutes_before
-    return RADAR_MINUTES_BEFORE[request.radar_start_type]
+def calculate_radar_minutes(radar_start_type: str, custom_minutes_before: int | None) -> int:
+    radar_start_type = RadarStartType(radar_start_type)
+    if radar_start_type == RadarStartType.CUSTOM:
+        return custom_minutes_before
+    return RADAR_MINUTES_BEFORE[radar_start_type]
 
 
 def generate_invite_code() -> str:
@@ -48,7 +49,8 @@ async def create_appointment(db: AsyncSession, host: User, request: AppointmentC
     """[API-04] 약속 생성, 초대 코드 발급, 방장 참가자 등록"""
     # DB에는 UTC naive datetime으로 저장 (기존 created_at 등과 동일)
     meet_at = request.meet_at.replace(tzinfo=None)
-    radar_start_at = meet_at - timedelta(minutes=calculate_radar_minutes(request))
+    radar_minutes = calculate_radar_minutes(request.radar_start_type, request.custom_radar_minutes_before)
+    radar_start_at = meet_at - timedelta(minutes=radar_minutes)
     host_id, host_nickname = host.id, host.nickname
 
     for attempt in range(MAX_INVITE_CODE_ATTEMPTS):

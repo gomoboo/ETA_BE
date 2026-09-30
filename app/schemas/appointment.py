@@ -82,3 +82,36 @@ class AppointmentCreateResponse(BaseModel):
     invite_code: str
     invite_url: str
     radar_start_at: datetime
+
+
+class InvitePreviewResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    title: str
+    meet_at: datetime
+    target_place_name: str
+    penalty_type: str
+    penalty_summary: str
+    radar_start_summary: str
+    status: str
+
+
+class JoinRequest(BaseModel):
+    # 생략하면 온보딩 닉네임 사용
+    nickname: Optional[str] = Field(None, description="약속 내 표시 닉네임 (2~10자)")
+
+
+class JoinResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    participant_id: int
+    join_status: str
+
+
+class LeaveResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    join_status: str
+    message: str

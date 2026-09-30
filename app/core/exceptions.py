@@ -24,6 +24,7 @@ class ErrorCode(Enum):
     INVITE_LINK_EXPIRED = (410, "만료된 초대 링크입니다.")
     ALREADY_JOINED = (409, "이미 참여 중인 약속입니다.")
     NOT_PARTICIPANT = (403, "해당 약속의 참가자가 아닙니다.")
+    APPOINTMENT_ALREADY_ENDED = (409, "이미 종료되었거나 취소된 약속입니다.")
 
     # 정산 (Settlement)
     SETTLEMENT_NOT_READY = (409, "아직 정산할 수 없는 약속입니다.")
