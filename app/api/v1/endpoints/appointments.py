@@ -6,9 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models import User
-from app.schemas.appointment import AppointmentCreateRequest, AppointmentCreateResponse
+from app.schemas.appointment import (
+    AppointmentCreateRequest,
+    AppointmentCreateResponse,
+    InvitePreviewResponse,
+    JoinRequest,
+    JoinResponse,
+    LeaveResponse,
+)
 from app.schemas.common import BaseResponse
-from app.services import appointment_service
+from app.services import appointment_service, invite_service
 
 router = APIRouter()
 
@@ -34,22 +41,53 @@ async def create_appointment(
         )
     )
 
-@router.get("/invite/{invite_code}")
-async def preview_invite(invite_code: str):
-    """[API-05] 초대 링크 정보 미리보기"""
-    return {"success": True, "data": {"appointmentId": 12, "title": "약속"}}
+@router.get("/invite/{invite_code}", response_model=BaseResponse[InvitePreviewResponse])
+async def preview_invite(invite_code: str, db: AsyncSession = Depends(get_db)):
+    """[API-05] 초대 링크 정보 미리보기 (온보딩 전에도 조회 가능)"""
+    appointment = await invite_service.get_appointment_by_invite_code(db, invite_code)
+    return BaseResponse(
+        data=InvitePreviewResponse(
+            appointment_id=appointment.id,
+            title=appointment.title,
+            meet_at=appointment.meet_at.replace(tzinfo=timezone.utc),
+            target_place_name=appointment.target_place_name,
+            penalty_type=appointment.penalty_type,
+            penalty_summary=invite_service.build_penalty_summary(appointment),
+            radar_start_summary=invite_service.build_radar_start_summary(appointment),
+            status=appointment.status,
+        )
+    )
 
-@router.post("/invite/{invite_code}/join")
-async def join_appointment(invite_code: str):
+@router.post("/invite/{invite_code}/join", response_model=BaseResponse[JoinResponse])
+async def join_appointment(
+    invite_code: str,
+    request: JoinRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """[API-06] 초대받은 약속 참여하기"""
-    return {"success": True, "data": {"appointmentId": 12, "participantId": 45}}
+    participant = await invite_service.join_appointment(db, current_user, invite_code, request.nickname)
+    return BaseResponse(
+        data=JoinResponse(
+            appointment_id=participant.appointment_id,
+            participant_id=participant.id,
+            join_status=participant.join_status,
+        )
+    )
 
 @router.get("/{appointment_id}")
 async def get_appointment_detail(appointment_id: int):
     """[API-07] 약속 대기 및 상세 화면 조회"""
     return {"success": True, "data": {"appointmentId": appointment_id}}
 
-@router.post("/{appointment_id}/leave")
-async def leave_appointment(appointment_id: int):
+@router.post("/{appointment_id}/leave", response_model=BaseResponse[LeaveResponse])
+async def leave_appointment(
+    appointment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """[API-08] 약속 나가기"""
-    return {"success": True, "data": {"joinStatus": "LEFT"}}
+    participant = await invite_service.leave_appointment(db, current_user, appointment_id)
+    return BaseResponse(
+        data=LeaveResponse(join_status=participant.join_status, message=invite_service.LEAVE_MESSAGE)
+    )

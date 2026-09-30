@@ -39,14 +39,6 @@ class AppointmentCreateRequest(BaseModel):
             raise ValueError("공백만 입력할 수 없습니다.")
         return value
 
-    @field_validator("penalty_type", mode="before")
-    @classmethod
-    def normalize_penalty_type(cls, value):
-        # API 명세는 지각비 모드를 "FEE"로, 모델은 "FINE"으로 정의하고 있어 둘 다 허용
-        if value == "FEE":
-            return PenaltyType.FINE
-        return value
-
     @field_validator("meet_at")
     @classmethod
     def meet_at_in_future(cls, value: datetime) -> datetime:
@@ -82,3 +74,36 @@ class AppointmentCreateResponse(BaseModel):
     invite_code: str
     invite_url: str
     radar_start_at: datetime
+
+
+class InvitePreviewResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    title: str
+    meet_at: datetime
+    target_place_name: str
+    penalty_type: str
+    penalty_summary: str
+    radar_start_summary: str
+    status: str
+
+
+class JoinRequest(BaseModel):
+    # 생략하면 온보딩 닉네임 사용
+    nickname: Optional[str] = Field(None, description="약속 내 표시 닉네임 (2~10자)")
+
+
+class JoinResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    appointment_id: int
+    participant_id: int
+    join_status: str
+
+
+class LeaveResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    join_status: str
+    message: str

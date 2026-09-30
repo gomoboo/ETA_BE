@@ -10,7 +10,7 @@ NICKNAME_MIN_LENGTH = 2
 NICKNAME_MAX_LENGTH = 10
 
 
-def _validate_nickname(nickname: str) -> str:
+def validate_nickname(nickname: str) -> str:
     nickname = nickname.strip()
     if not NICKNAME_MIN_LENGTH <= len(nickname) <= NICKNAME_MAX_LENGTH:
         raise AppException(ErrorCode.INVALID_NICKNAME_LENGTH)
@@ -35,7 +35,7 @@ async def _get_by_guest_uuid(db: AsyncSession, guest_uuid: str) -> User | None:
 
 async def onboard_user(db: AsyncSession, request: OnboardingRequest) -> User:
     """[API-01] guestUuid 기준으로 유저가 있으면 갱신, 없으면 생성"""
-    nickname = _validate_nickname(request.nickname)
+    nickname = validate_nickname(request.nickname)
 
     user = await _get_by_guest_uuid(db, request.guest_uuid)
     if user is None:
