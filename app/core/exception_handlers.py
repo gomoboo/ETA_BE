@@ -49,7 +49,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         {
             # loc 첫 요소는 위치(body/query/path/header/cookie)이므로 제외
             "field": ".".join(str(loc) for loc in err["loc"][1:]),
-            "reason": err["msg"],
+            # 커스텀 validator 메시지에 Pydantic이 붙이는 접두어 제거
+            "reason": err["msg"].removeprefix("Value error, "),
         }
         for err in exc.errors()
     ]
