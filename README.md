@@ -77,3 +77,4 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 * Swagger API 문서: `http://localhost:8000/docs`
 * 헬스 체크: `http://localhost:8000/health`
 * DB 스키마 및 데이터 사전: [docs/DB_SCHEMA.md](docs/DB_SCHEMA.md)
+* 협업 컨벤션 가이드: [docs/CONVENTION.md](docs/CONVENTION.md)
