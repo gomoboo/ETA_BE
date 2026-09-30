@@ -31,7 +31,7 @@ def _format_minutes(minutes: int) -> str:
 
 
 def build_penalty_summary(appointment: Appointment) -> str:
-    if appointment.penalty_type == PenaltyType.FINE.value:
+    if appointment.penalty_type == PenaltyType.FEE.value:
         return f"지각비: 분당 {appointment.fine_per_minute:,}원"
     return f"벌칙: {appointment.penalty_content}"
 

@@ -39,14 +39,6 @@ class AppointmentCreateRequest(BaseModel):
             raise ValueError("공백만 입력할 수 없습니다.")
         return value
 
-    @field_validator("penalty_type", mode="before")
-    @classmethod
-    def normalize_penalty_type(cls, value):
-        # API 명세는 지각비 모드를 "FEE"로, 모델은 "FINE"으로 정의하고 있어 둘 다 허용
-        if value == "FEE":
-            return PenaltyType.FINE
-        return value
-
     @field_validator("meet_at")
     @classmethod
     def meet_at_in_future(cls, value: datetime) -> datetime:
