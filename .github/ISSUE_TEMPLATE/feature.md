@@ -1,5 +1,5 @@
 ---
-name: 작업 / 기능 개발 템플릿
+name: 기능 개발 (Feature)
 about: 새로운 기능 개발 또는 작업 단위를 등록할 때 사용합니다.
 title: "[기능] "
 labels: "enhancement"

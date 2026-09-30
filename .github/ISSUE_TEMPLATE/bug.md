@@ -1,5 +1,5 @@
 ---
-name: 버그 수정 템플릿
+name: 버그 수정 (Bug)
 about: 발생한 버그를 등록하고 수정 작업을 진행할 때 사용합니다.
 title: "[버그] "
 labels: "bug"
