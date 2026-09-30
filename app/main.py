@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.exception_handlers import register_exception_handlers
 from app.api.v1.router import api_router
 
 app = FastAPI(
@@ -17,6 +18,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 글로벌 예외 핸들러 등록
+register_exception_handlers(app)
 
 # v1 라우터 등록
 app.include_router(api_router, prefix=settings.API_V1_STR)
