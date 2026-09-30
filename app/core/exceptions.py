@@ -29,6 +29,9 @@ class ErrorCode(Enum):
     SETTLEMENT_NOT_READY = (409, "아직 정산할 수 없는 약속입니다.")
     WARRANT_NOT_FOUND = (404, "발부된 체포 영장이 없습니다.")
 
+    # 외부 API (External)
+    KAKAO_API_ERROR = (502, "장소 검색 서비스에 일시적인 문제가 발생했습니다.")
+
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         self.message = message
