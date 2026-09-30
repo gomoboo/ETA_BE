@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,20 +9,53 @@ from app.models import User
 from app.schemas.appointment import (
     AppointmentCreateRequest,
     AppointmentCreateResponse,
+    AppointmentDetailResponse,
+    HomeAppointmentItem,
+    HomeAppointmentsResponse,
     InvitePreviewResponse,
     JoinRequest,
     JoinResponse,
     LeaveResponse,
+    ParticipantItem,
+    PenaltyInfo,
+    TargetPlace,
 )
 from app.schemas.common import BaseResponse
-from app.services import appointment_service, invite_service
+from app.services import appointment_query_service, appointment_service, invite_service
 
 router = APIRouter()
 
-@router.get("/home")
-async def get_home_appointments():
+
+def _as_utc(value: datetime) -> datetime:
+    # DB의 UTC naive datetime을 응답용 UTC aware datetime으로 변환
+    return value.replace(tzinfo=timezone.utc)
+
+
+@router.get("/home", response_model=BaseResponse[HomeAppointmentsResponse])
+async def get_home_appointments(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """[API-02] 홈 화면 약속 목록 조회"""
-    return {"success": True, "data": {"activeAppointments": [], "upcomingAppointments": []}}
+    active, upcoming = await appointment_query_service.get_home_appointments(db, current_user)
+
+    def to_item(home: appointment_query_service.HomeAppointment) -> HomeAppointmentItem:
+        appointment = home.appointment
+        return HomeAppointmentItem(
+            appointment_id=appointment.id,
+            title=appointment.title,
+            meet_at=_as_utc(appointment.meet_at),
+            target_place_name=appointment.target_place_name,
+            is_location_sharing_active=home.is_location_sharing_active,
+            participant_count=home.participant_count,
+        )
+
+    return BaseResponse(
+        data=HomeAppointmentsResponse(
+            active_appointments=[to_item(h) for h in active],
+            upcoming_appointments=[to_item(h) for h in upcoming],
+        )
+    )
 
 @router.post("", response_model=BaseResponse[AppointmentCreateResponse])
 async def create_appointment(
@@ -37,7 +70,7 @@ async def create_appointment(
             appointment_id=appointment.id,
             invite_code=appointment.invite_code,
             invite_url=appointment_service.build_invite_url(appointment.invite_code),
-            radar_start_at=appointment.radar_start_at.replace(tzinfo=timezone.utc),
+            radar_start_at=_as_utc(appointment.radar_start_at),
         )
     )
 
@@ -49,7 +82,7 @@ async def preview_invite(invite_code: str, db: AsyncSession = Depends(get_db)):
         data=InvitePreviewResponse(
             appointment_id=appointment.id,
             title=appointment.title,
-            meet_at=appointment.meet_at.replace(tzinfo=timezone.utc),
+            meet_at=_as_utc(appointment.meet_at),
             target_place_name=appointment.target_place_name,
             penalty_type=appointment.penalty_type,
             penalty_summary=invite_service.build_penalty_summary(appointment),
@@ -75,10 +108,48 @@ async def join_appointment(
         )
     )
 
-@router.get("/{appointment_id}")
-async def get_appointment_detail(appointment_id: int):
+@router.get("/{appointment_id}", response_model=BaseResponse[AppointmentDetailResponse])
+async def get_appointment_detail(
+    appointment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """[API-07] 약속 대기 및 상세 화면 조회"""
-    return {"success": True, "data": {"appointmentId": appointment_id}}
+    appointment, participants = await appointment_query_service.get_appointment_detail(
+        db, current_user, appointment_id
+    )
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return BaseResponse(
+        data=AppointmentDetailResponse(
+            appointment_id=appointment.id,
+            title=appointment.title,
+            meet_at=_as_utc(appointment.meet_at),
+            radar_start_at=_as_utc(appointment.radar_start_at),
+            remaining_seconds_to_radar=appointment_query_service.remaining_seconds_to_radar(appointment, now),
+            target_place=TargetPlace(
+                name=appointment.target_place_name,
+                address=appointment.target_address,
+                latitude=appointment.target_latitude,
+                longitude=appointment.target_longitude,
+            ),
+            penalty=PenaltyInfo(
+                type=appointment.penalty_type,
+                content=appointment.penalty_content,
+                fine_per_minute=appointment.fine_per_minute,
+            ),
+            invite_url=appointment_service.build_invite_url(appointment.invite_code),
+            participants=[
+                ParticipantItem(
+                    participant_id=p.id,
+                    nickname=p.nickname,
+                    is_host=p.is_host,
+                    is_ready=p.is_ready,
+                    join_status=p.join_status,
+                )
+                for p in participants
+            ],
+        )
+    )
 
 @router.post("/{appointment_id}/leave", response_model=BaseResponse[LeaveResponse])
 async def leave_appointment(
