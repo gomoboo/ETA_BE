@@ -70,7 +70,21 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 3. 서버 실행
+### 3. DB 마이그레이션 적용
+`.env`의 `DATABASE_URL` 기준으로 테이블을 생성합니다.
+```bash
+alembic upgrade head
+```
+
+모델(`app/models/`)을 수정했다면 마이그레이션 파일을 생성한 뒤 적용합니다.
+```bash
+alembic revision --autogenerate -m "변경 내용 요약"
+alembic upgrade head
+```
+* 생성된 파일(`alembic/versions/`)은 커밋 전에 내용을 꼭 확인해주세요.
+* 되돌리기: `alembic downgrade -1`
+
+### 4. 서버 실행
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
