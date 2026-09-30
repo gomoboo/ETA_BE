@@ -47,7 +47,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     errors = [
         {
-            "field": ".".join(str(loc) for loc in err["loc"] if loc != "body"),
+            # loc 첫 요소는 위치(body/query/path/header/cookie)이므로 제외
+            "field": ".".join(str(loc) for loc in err["loc"][1:]),
             "reason": err["msg"],
         }
         for err in exc.errors()
