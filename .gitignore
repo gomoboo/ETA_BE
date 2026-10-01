@@ -34,6 +34,7 @@ wheels/
 *.swp
 *.swo
 .DS_Store
+.local/
 
 # Logs & DB
 *.log
