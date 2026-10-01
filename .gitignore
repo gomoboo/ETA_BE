@@ -43,4 +43,9 @@ wheels/
 
 # Docs & Specifications
 docs/specs/
+*.docx
+create_proposal_docx.py
+
+# AI Agent Configs
+AGENTS.md
 
