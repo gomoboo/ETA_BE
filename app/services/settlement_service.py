@@ -10,7 +10,6 @@ from app.core.exceptions import AppException, ErrorCode
 from app.models import (
     Appointment,
     AppointmentStatus,
-    ArrivalStatus,
     JoinStatus,
     Participant,
     PenaltyType,
@@ -65,7 +64,7 @@ def calculate_fine_amount(appointment: Appointment, late_minutes: int) -> int:
 def _is_settlement_ready(appointment: Appointment, participants: list[Participant]) -> bool:
     if appointment.status == AppointmentStatus.COMPLETED.value:
         return True
-    if participants and all(p.arrival_status != ArrivalStatus.NOT_ARRIVED.value for p in participants):
+    if participants and all(p.is_arrived for p in participants):
         return True
     return _utcnow() >= appointment.meet_at + timedelta(minutes=settings.SETTLEMENT_TIMEOUT_MINUTES)
 
