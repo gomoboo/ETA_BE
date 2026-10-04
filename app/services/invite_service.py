@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, ErrorCode
@@ -79,8 +80,14 @@ async def join_appointment(db: AsyncSession, user: User, invite_code: str, nickn
     else:
         participant.join_status = JoinStatus.JOINED.value
         participant.nickname = nickname
+        participant.left_at = None
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 같은 유저의 참여 요청이 동시에 들어와 먼저 등록된 경우 (uq_participant_appointment_user)
+        await db.rollback()
+        raise AppException(ErrorCode.ALREADY_JOINED)
     await db.refresh(participant)
     return participant
 
@@ -110,6 +117,7 @@ async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -
         raise AppException(ErrorCode.NOT_PARTICIPANT)
 
     participant.join_status = JoinStatus.LEFT.value
+    participant.left_at = _utcnow()
     if participant.is_host:
         participant.is_host = False
         result = await db.execute(
@@ -124,6 +132,7 @@ async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -
         next_host = result.scalars().first()
         if next_host is not None:
             next_host.is_host = True
+            appointment.host_id = next_host.user_id
         else:
             # 남은 참가자가 없으면 약속 취소
             appointment.status = AppointmentStatus.CANCELLED.value

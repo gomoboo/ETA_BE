@@ -55,6 +55,7 @@ async def create_appointment(db: AsyncSession, host: User, request: AppointmentC
 
     for attempt in range(MAX_INVITE_CODE_ATTEMPTS):
         appointment = Appointment(
+            host_id=host_id,
             title=request.title,
             target_place_name=request.target_place_name,
             target_address=request.target_address,

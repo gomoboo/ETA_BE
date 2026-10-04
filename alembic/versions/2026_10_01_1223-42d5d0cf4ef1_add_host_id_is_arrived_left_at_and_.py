@@ -26,7 +26,7 @@ def upgrade() -> None:
         batch_op.create_foreign_key('fk_appointments_host_id_users', 'users', ['host_id'], ['id'], ondelete='SET NULL')
 
     with op.batch_alter_table('participants', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_arrived', sa.Boolean(), nullable=False, comment='도착(체크인) 여부'))
+        batch_op.add_column(sa.Column('is_arrived', sa.Boolean(), nullable=False, server_default=sa.false(), comment='도착(체크인) 여부'))
         batch_op.add_column(sa.Column('left_at', sa.DateTime(), nullable=True, comment='방 나간(퇴장) 시각'))
         batch_op.create_unique_constraint('uq_participant_appointment_user', ['appointment_id', 'user_id'])
 
