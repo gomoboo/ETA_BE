@@ -84,10 +84,12 @@ def test_penalty_settlement_when_all_arrived_counts_ignored_pokes(client, db, se
     arrive(db, appointment_id, "host", meet_at, "ON_TIME")
     arrive(db, appointment_id, "u3", meet_at - timedelta(minutes=1), "EARLY")
     arrive(db, appointment_id, "u2", meet_at + timedelta(minutes=5, seconds=59), "LATE")
-    pid = lambda g: db.scalar(
-        "select id from participants where appointment_id=? and user_id=(select id from users where guest_uuid=?)",
-        appointment_id, g,
-    )
+    def pid(guest_uuid):
+        return db.scalar(
+            "select id from participants where appointment_id=? and user_id=(select id from users where guest_uuid=?)",
+            appointment_id, guest_uuid,
+        )
+
     for responded in (None, None, "2026-01-01 00:00:00"):  # 무시 2회 + 응답 1회
         db.execute(
             "insert into poke_logs(appointment_id, sender_participant_id, target_participant_id, created_at, responded_at) "

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 import enum
 from app.core.database import Base
@@ -30,7 +30,7 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="약속 고유 식별자 PK")
     host_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="방장 유저 ID FK")
     title = Column(String(100), nullable=False, comment="약속 이름 (예: 강남역 맛집 탐방)")
-    
+
     # 목적지 정보
     target_place_name = Column(String(150), nullable=False, comment="도착 장소명")
     target_address = Column(String(255), nullable=True, comment="도착 장소 도로명/지번 주소")
