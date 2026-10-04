@@ -1,0 +1,55 @@
+# 로컬/서버에서 API + PostgreSQL + Redis를 한 번에 실행
+#   docker compose up -d --build
+#   docker compose logs -f api
+#   docker compose down        (데이터 유지)   /   docker compose down -v   (데이터 삭제)
+services:
+  api:
+    build: .
+    image: eta-backend:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # .env 값보다 우선: 컨테이너 네트워크 안의 서비스 주소 사용
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-eta}:${POSTGRES_PASSWORD:-eta}@db:5432/${POSTGRES_DB:-eta}
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: ${DEBUG:-False}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eta}
+      POSTGRES_DB: ${POSTGRES_DB:-eta}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eta} -d ${POSTGRES_DB:-eta}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

@@ -56,6 +56,21 @@ gomoboo/
 
 ---
 
+## 🐳 Docker로 실행 (API + PostgreSQL + Redis)
+
+```bash
+docker compose up -d --build     # 빌드 후 실행 (시작 시 alembic upgrade head 자동 적용)
+docker compose logs -f api       # 로그 확인
+docker compose down              # 종료 (데이터 유지)
+docker compose down -v           # 종료 + 데이터 삭제
+```
+* API: `http://localhost:8000` (Swagger `/docs`, 헬스체크 `/health`)
+* `.env`가 있으면 읽어서 사용하고(카카오 키 등), `DATABASE_URL`과 `REDIS_URL`은 컨테이너 내부 주소로 자동 설정됩니다.
+* DB 계정은 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` 환경 변수로 바꿀 수 있습니다(기본값 `eta`).
+* 웹소켓 연결을 프로세스 메모리에서 관리하므로 **API는 워커 1개로 실행**합니다. 여러 인스턴스로 늘리려면 Redis Pub/Sub 기반 브로드캐스트가 필요합니다.
+
+---
+
 ## 🚀 로컬 실행 방법 (Getting Started)
 
 ### 1. 가상환경 생성 및 패키지 설치
