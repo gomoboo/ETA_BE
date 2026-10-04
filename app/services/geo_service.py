@@ -1,7 +1,7 @@
 import json
 import math
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from redis.asyncio import Redis
 from app.core.redis import get_redis
 

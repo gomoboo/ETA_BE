@@ -1,0 +1,9 @@
+# CI 린트 설정: 버그로 이어질 수 있는 규칙 위주로 검사 (스타일 규칙은 팀 합의 후 확대)
+line-length = 120
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[lint]
+select = ["E", "F", "W"]
+# 한 줄 길이는 긴 한글 설명(comment=) 때문에 제외
+ignore = ["E501"]

@@ -88,8 +88,10 @@ alembic upgrade head
 ```bash
 pip install -r requirements-dev.txt
 pytest
+ruff check .
 ```
 * 테스트마다 임시 SQLite DB를 새로 만들어 사용하므로 별도 DB나 Redis 설정이 필요 없습니다.
+* PR과 `main`/`dev` push 시 GitHub Actions CI(`.github/workflows/ci.yml`)가 린트, 테스트, PostgreSQL 마이그레이션 검사를 자동으로 실행합니다.
 
 ### 5. 서버 실행
 ```bash
