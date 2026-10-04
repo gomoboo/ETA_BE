@@ -4,11 +4,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException, ErrorCode
+from app.core.time import utcnow
 from app.core.websocket_manager import manager
 from app.models import (
     Appointment,
@@ -29,10 +30,6 @@ ENDED_STATUSES = {AppointmentStatus.COMPLETED.value, AppointmentStatus.CANCELLED
 # 약속 시각 기준 이 시간(초) 이전에 도착하면 EARLY, 그 이후 ~ 1분 미만 지각이면 ON_TIME
 ON_TIME_WINDOW_SECONDS = 60
 
-
-def _utcnow() -> datetime:
-    # DB에는 UTC naive datetime으로 저장되어 있음
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _iso_utc(value: datetime) -> str:
@@ -112,7 +109,7 @@ def _display_movement_state(location: dict, participant: Participant, late_secon
 
 async def build_map_sync(db: AsyncSession, appointment: Appointment) -> dict:
     """[WS-02] map:sync 메시지 구성 (위치를 한 번 이상 보낸 참여 중 참가자만 포함)"""
-    now = _utcnow()
+    now = utcnow()
     locations = await GeoService.get_all_participants_locations(appointment.id)
     participants = []
     for participant in await _joined_participants(db, appointment.id):
@@ -148,7 +145,7 @@ async def handle_location_update(
     if payload.appointment_id not in (None, appointment.id) or payload.participant_id not in (None, participant.id):
         raise AppException(ErrorCode.INVALID_INPUT, "연결 정보와 appointmentId/participantId가 일치하지 않습니다.")
 
-    now = _utcnow()
+    now = utcnow()
     if appointment.status != AppointmentStatus.RADAR_ACTIVE.value:
         if now < appointment.radar_start_at:
             raise AppException(ErrorCode.RADAR_NOT_STARTED)
@@ -227,6 +224,7 @@ async def handle_poke_send(
         raise AppException(ErrorCode.INVALID_INPUT, "자기 자신은 찌를 수 없습니다.")
     if target.is_arrived:
         raise AppException(ErrorCode.CONFLICT, "이미 도착한 참가자는 찌를 수 없습니다.")
+    await _check_poke_cooldown(db, participant.id, target.id)
 
     poke = PokeLog(
         appointment_id=appointment.id,
@@ -238,7 +236,7 @@ async def handle_poke_send(
     await db.refresh(poke)
 
     location = await GeoService.get_participant_location(appointment.id, target.id)
-    remaining_seconds = (appointment.meet_at - _utcnow()).total_seconds()
+    remaining_seconds = (appointment.meet_at - utcnow()).total_seconds()
     message_to_target = {
         "type": "poke:received",
         "pokeId": poke.id,
@@ -258,6 +256,21 @@ async def handle_poke_send(
         logger.info("Poke %s target %s is offline; FCM fallback not implemented", poke.id, target.id)
 
 
+async def _check_poke_cooldown(db: AsyncSession, sender_id: int, target_id: int) -> None:
+    """같은 대상에게 POKE_COOLDOWN_SECONDS 안에 다시 찌르지 못하게 제한"""
+    last_poked_at = await db.scalar(
+        select(func.max(PokeLog.created_at)).where(
+            PokeLog.sender_participant_id == sender_id,
+            PokeLog.target_participant_id == target_id,
+        )
+    )
+    if last_poked_at is None:
+        return
+    remaining = settings.POKE_COOLDOWN_SECONDS - int((utcnow() - last_poked_at).total_seconds())
+    if remaining > 0:
+        raise AppException(ErrorCode.POKE_COOLDOWN, f"같은 친구는 {remaining}초 뒤에 다시 찌를 수 있습니다.")
+
+
 async def handle_poke_respond(
     db: AsyncSession, appointment: Appointment, participant: Participant, message: dict
 ) -> None:
@@ -269,7 +282,7 @@ async def handle_poke_respond(
         raise AppException(ErrorCode.CONFLICT, "이미 응답한 찌르기입니다.")
 
     poke.response_action = payload.action
-    poke.responded_at = _utcnow()
+    poke.responded_at = utcnow()
     await db.commit()
 
 

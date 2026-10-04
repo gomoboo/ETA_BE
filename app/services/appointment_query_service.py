@@ -1,18 +1,15 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, ErrorCode
+from app.core.time import utcnow
 from app.models import Appointment, AppointmentStatus, JoinStatus, Participant, User
 
 ENDED_STATUSES = {AppointmentStatus.COMPLETED.value, AppointmentStatus.CANCELLED.value}
 
-
-def _utcnow() -> datetime:
-    # DB에는 UTC naive datetime으로 저장되어 있음
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def is_location_sharing_active(appointment: Appointment, now: datetime) -> bool:
@@ -52,7 +49,7 @@ async def get_home_appointments(db: AsyncSession, user: User) -> tuple[list[Home
         .order_by(Appointment.meet_at, Appointment.id)
     )
 
-    now = _utcnow()
+    now = utcnow()
     active, upcoming = [], []
     for appointment, count in result.all():
         sharing = is_location_sharing_active(appointment, now)

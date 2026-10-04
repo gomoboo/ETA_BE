@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.time import utcnow
 from app.models import User
 from app.schemas.appointment import (
     AppointmentCreateRequest,
@@ -118,7 +119,7 @@ async def get_appointment_detail(
     appointment, participants = await appointment_query_service.get_appointment_detail(
         db, current_user, appointment_id
     )
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utcnow()
     return BaseResponse(
         data=AppointmentDetailResponse(
             appointment_id=appointment.id,

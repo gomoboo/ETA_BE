@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time import utcnow
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -18,8 +18,8 @@ class User(Base):
     notification_allowed = Column(Boolean, nullable=False, default=True, comment="FCM 푸시 알림 허용 여부")
     fcm_token = Column(String(255), nullable=True, comment="푸시 알림 전송용 FCM 기기 토큰")
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="생성 일시")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, comment="수정 일시")
+    created_at = Column(DateTime, default=utcnow, nullable=False, comment="생성 일시")
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False, comment="수정 일시")
 
     # 관계 정의
     participations = relationship("Participant", back_populates="user", cascade="all, delete-orphan")

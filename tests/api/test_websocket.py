@@ -257,6 +257,24 @@ def test_poke_to_offline_target_is_logged(client, db, room):
     assert db.scalar("select count(*) from poke_logs where target_participant_id=?", pids["u3"]) == 1
 
 
+def test_poke_cooldown_per_target(client, db, room):
+    appointment_id, pids = room()
+    with connect(client, appointment_id, pids["host"], "host") as ws:
+        ws.send_json({"type": "poke:send", "targetParticipantId": pids["u2"]})
+        ws.send_json({"type": "poke:send", "targetParticipantId": pids["u2"]})  # 바로 다시 찌르기
+        error = ws.receive_json()
+        assert error["code"] == "POKE_COOLDOWN"
+        assert "초 뒤에 다시" in error["message"]
+
+        ws.send_json({"type": "poke:send", "targetParticipantId": pids["u3"]})  # 다른 대상은 가능
+        db.execute("update poke_logs set created_at=datetime('now', '-61 seconds')")  # 쿨다운 경과
+        ws.send_json({"type": "poke:send", "targetParticipantId": pids["u2"]})
+        ws.send_json(location(FAR_2KM))
+        assert ws.receive_json()["type"] == "map:sync"  # 에러 없이 처리됨
+
+    assert db.scalar("select count(*) from poke_logs") == 3
+
+
 def test_poke_validation(client, db, room):
     appointment_id, pids = room()
     db.execute("update participants set is_arrived=1 where id=?", pids["u3"])

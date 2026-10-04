@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time import utcnow
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 import enum
@@ -52,8 +52,8 @@ class Appointment(Base):
     invite_code = Column(String(12), unique=True, index=True, nullable=False, comment="6자리 초대 난수 코드 (예: ETA99K)")
     status = Column(String(20), nullable=False, default="SCHEDULED", comment="약속 상태 (SCHEDULED, RADAR_ACTIVE, COMPLETED, CANCELLED)")
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     # 관계 정의
     participants = relationship("Participant", back_populates="appointment", cascade="all, delete-orphan")

@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time import utcnow
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, false
 from sqlalchemy.orm import relationship
 import enum
@@ -41,8 +41,8 @@ class Participant(Base):
     final_late_minutes = Column(Integer, nullable=False, default=0, comment="최종 지각 시간 (분)")
     final_fine_amount = Column(Integer, nullable=False, default=0, comment="최종 정산 지각비 (원)")
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     # 관계 정의
     user = relationship("User", back_populates="participations")
