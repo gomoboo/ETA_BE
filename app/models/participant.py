@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, false
 from sqlalchemy.orm import relationship
 import enum
 from app.core.database import Base
@@ -35,7 +35,7 @@ class Participant(Base):
 
     # 도착 및 지각 결과
     arrival_status = Column(String(20), nullable=False, default="NOT_ARRIVED", comment="도착 상태 (NOT_ARRIVED, EARLY, ON_TIME, LATE)")
-    is_arrived = Column(Boolean, nullable=False, default=False, comment="도착(체크인) 여부")
+    is_arrived = Column(Boolean, nullable=False, default=False, server_default=false(), comment="도착(체크인) 여부")
     arrived_at = Column(DateTime, nullable=True, comment="실제 도착 인증 시각")
     left_at = Column(DateTime, nullable=True, comment="방 나간(퇴장) 시각")
     final_late_minutes = Column(Integer, nullable=False, default=0, comment="최종 지각 시간 (분)")
