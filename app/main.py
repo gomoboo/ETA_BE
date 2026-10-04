@@ -1,13 +1,27 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
+from app.core.redis import init_redis_pool, close_redis_pool
 from app.api.v1.router import api_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        await init_redis_pool()
+    except Exception as e:
+        print(f"[Warning] Redis connection failed on startup: {e}")
+    yield
+    # Shutdown
+    await close_redis_pool()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # CORS 설정 (프론트엔드 연동)
