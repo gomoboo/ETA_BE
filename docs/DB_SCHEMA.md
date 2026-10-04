@@ -156,7 +156,7 @@ erDiagram
 | `is_ready` | `BOOLEAN` | NOT NULL | `true` | 대기실 준비 상태 여부 |
 | `join_status` | `VARCHAR(20)` | NOT NULL | `'JOINED'` | 참여 상태 (`JOINED`: 참여중, `LEFT`: 방 나감) |
 | `is_arrived` | `BOOLEAN` | NOT NULL | `false` | **도착 체크인 완료 여부 플래그** |
-| `arrived_at` | `TIMESTAMP` | NULL | - | 실제 반경 50m 진입 체크인 일시 (UTC) |
+| `arrived_at` | `TIMESTAMP` | NULL | - | 실제 반경 30m 진입 체크인 일시 (UTC) |
 | `arrival_status` | `VARCHAR(20)` | NULL | - | 도착 상태 (`EARLY`, `ON_TIME`, `LATE`) |
 | `final_late_minutes`| `INT` | NOT NULL | `0` | 최종 지각 시간 (분 단위 버림) |
 | `final_fine_amount` | `INT` | NOT NULL | `0` | 최종 개인 지각비 금액 (원 단위) |
@@ -216,10 +216,11 @@ erDiagram
 | | `RADAR_ACTIVE` | 레이더 시작 시각 도달 (실시간 위치 공유 활성) |
 | | `COMPLETED` | 정산 완료 또는 전원 도착 완료 |
 | | `CANCELLED` | 방장 및 참가자 전원 퇴장으로 인한 약속 취소 |
-| **`ArrivalStatus`** | `EARLY` | 약속 시간보다 일찍 반경 50m 진입 |
-| | `ON_TIME` | 정시 도착 (약속 시간 이내) |
+| **`ArrivalStatus`** | `EARLY` | 약속 시간 1분 전보다 일찍 반경 30m 진입 |
+| | `ON_TIME` | 정시 도착 (약속 1분 전 ~ 1분 미만 지각) |
 | | `LATE` | 약속 시간 초과 후 지각 도착 |
-| **`MovementState`** *(웹소켓)* | `MOVING` | 정상 이동 중 (속도 > 0 km/h) |
-| | `SUSPECTED_NOT_DEPARTED` | 5분 이상 속도 0 및 위치 변화 없음 (미출발 의심) |
+| **`MovementState`** *(웹소켓)* | `MOVING` | 이동 중 (속도 > 2 km/h) |
+| | `STOPPED` | 잠시 정지 (속도 ≤ 2 km/h, 5분 미만) |
+| | `SUSPECTED_NOT_DEPARTED` | 정지 기준점 반경 15m 안에 5분 이상 머묾 (미출발 의심) |
 | | `LATE` | 약속 시간 초과 상태로 이동 중 |
-| | `ARRIVED` | 목적지 50m 반경 체크인 완료 |
+| | `ARRIVED` | 목적지 30m 반경 체크인 완료 (반경은 `GEOFENCE_RADIUS_METERS` 설정) |

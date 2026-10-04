@@ -30,6 +30,10 @@ def get_session_local():
         )
     return _AsyncSessionLocal
 
+def get_session_factory() -> async_sessionmaker:
+    """웹소켓처럼 요청 단위가 아닌 곳에서 메시지마다 세션을 열기 위한 의존성"""
+    return get_session_local()
+
 async def get_db():
     """FastAPI Depends용 비동기 DB 세션 제너레이터"""
     session_factory = get_session_local()

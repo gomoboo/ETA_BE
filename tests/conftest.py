@@ -1,12 +1,14 @@
 import asyncio
 import sqlite3
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import app.models  # noqa: F401  모델을 Base.metadata에 등록
-from app.core.database import Base, get_db
+import app.core.redis as redis_module
+from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 from tests.helpers import auth, future_iso
 
@@ -41,8 +43,16 @@ def db(db_path) -> Database:
 
 
 @pytest.fixture
-def client(db_path):
-    """테스트마다 새 SQLite DB를 만들고 get_db 의존성을 교체한 TestClient"""
+def fake_redis(monkeypatch):
+    """실제 Redis 대신 메모리 기반 fakeredis 사용"""
+    client = fakeredis.FakeAsyncRedis(decode_responses=True)
+    monkeypatch.setattr(redis_module, "redis_client", client)
+    return client
+
+
+@pytest.fixture
+def client(db_path, fake_redis):
+    """테스트마다 새 SQLite DB와 fakeredis를 쓰도록 의존성을 교체한 TestClient"""
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
 
     async def create_tables():
@@ -57,9 +67,11 @@ def client(db_path):
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session_factory] = lambda: session_factory
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_session_factory, None)
     asyncio.run(engine.dispose())
 
 
