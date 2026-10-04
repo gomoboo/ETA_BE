@@ -51,6 +51,7 @@ def test_detail_matches_spec(client, users, create_appointment, join):
     }
     assert data["penalty"] == {"type": "FEE", "content": None, "finePerMinute": 1000}
     assert data["inviteUrl"] == appointment["inviteUrl"]
+    assert data["myParticipantId"] == data["participants"][1]["participantId"]  # 요청자(민수) 본인
     assert data["radarStartAt"] == appointment["radarStartAt"]
     assert abs(data["remainingSecondsToRadar"] - (2 * 86400 - 1800)) <= 5
     assert [(p["nickname"], p["isHost"], p["joinStatus"]) for p in data["participants"]] == [
