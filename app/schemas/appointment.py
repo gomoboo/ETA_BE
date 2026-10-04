@@ -163,4 +163,6 @@ class AppointmentDetailResponse(BaseModel):
     target_place: TargetPlace
     penalty: PenaltyInfo
     invite_url: str
+    # 명세 외 추가 필드: 요청한 사용자 본인의 participantId (웹소켓 접속에 필요)
+    my_participant_id: int
     participants: list[ParticipantItem]

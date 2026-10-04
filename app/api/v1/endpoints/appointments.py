@@ -138,6 +138,7 @@ async def get_appointment_detail(
                 fine_per_minute=appointment.fine_per_minute,
             ),
             invite_url=appointment_service.build_invite_url(appointment.invite_code),
+            my_participant_id=next(p.id for p in participants if p.user_id == current_user.id),
             participants=[
                 ParticipantItem(
                     participant_id=p.id,
