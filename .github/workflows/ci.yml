@@ -69,3 +69,16 @@ jobs:
       - run: alembic downgrade base
       - run: alembic upgrade head
       - run: alembic check
+
+  docker:
+    name: Docker (build & health)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 이미지 빌드 → API + PostgreSQL + Redis 기동(시작 시 마이그레이션 적용) → 헬스체크
+      - run: docker compose up -d --build --wait --wait-timeout 120
+      - run: curl -fsS http://localhost:8000/health
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
