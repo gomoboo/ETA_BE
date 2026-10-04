@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # 정산: 약속 시간 이후 이 시간(분)이 지나면 미도착자가 있어도 정산 확정 (미도착자 지각 시간 = 이 값)
     SETTLEMENT_TIMEOUT_MINUTES: int = 60
 
+    # 실시간 레이더: 목적지 반경 이 거리(m) 안에 들어오면 자동 체크인 (WS-06 명세 30m)
+    GEOFENCE_RADIUS_METERS: float = 30.0
+
     # External APIs
     KAKAO_REST_API_KEY: Optional[str] = None
     FCM_SERVER_KEY: Optional[str] = None

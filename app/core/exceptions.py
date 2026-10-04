@@ -25,6 +25,10 @@ class ErrorCode(Enum):
     ALREADY_JOINED = (409, "이미 참여 중인 약속입니다.")
     NOT_PARTICIPANT = (403, "해당 약속의 참가자가 아닙니다.")
     APPOINTMENT_ALREADY_ENDED = (409, "이미 종료되었거나 취소된 약속입니다.")
+    RADAR_NOT_STARTED = (409, "아직 위치 공유(레이더)가 시작되지 않았습니다.")
+
+    # 찌르기 (Poke)
+    POKE_NOT_FOUND = (404, "존재하지 않는 찌르기입니다.")
 
     # 정산 (Settlement)
     SETTLEMENT_NOT_READY = (409, "아직 정산할 수 없는 약속입니다.")
