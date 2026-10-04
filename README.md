@@ -84,7 +84,14 @@ alembic upgrade head
 * 생성된 파일(`alembic/versions/`)은 커밋 전에 내용을 꼭 확인해주세요.
 * 되돌리기: `alembic downgrade -1`
 
-### 4. 서버 실행
+### 4. 테스트 실행
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+* 테스트마다 임시 SQLite DB를 새로 만들어 사용하므로 별도 DB나 Redis 설정이 필요 없습니다.
+
+### 5. 서버 실행
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
