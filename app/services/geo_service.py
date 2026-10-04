@@ -114,47 +114,38 @@ class GeoService:
         prev_raw = await redis.hget(cache_key, str(participant_id))
         prev_data: Optional[Dict[str, Any]] = json.loads(prev_raw) if prev_raw else None
 
-        stopped_since: Optional[float] = None
-        is_arrived = False
+        is_arrived = bool(prev_data and prev_data.get("isArrived", False))
 
-        if prev_data:
-            is_arrived = prev_data.get("isArrived", False)
-            prev_lat = prev_data.get("latitude", latitude)
-            prev_lng = prev_data.get("longitude", longitude)
-            prev_stopped_since = prev_data.get("stoppedSince")
-
-            # 이전 위치와의 이동 거리
-            moved_distance = calculate_haversine_distance(prev_lat, prev_lng, latitude, longitude)
-
-            # 정지 여부 판정: 속도가 임계값 이하이거나 이전 위치에서 거의 이동하지 않은 경우
-            is_stopped = (speed_kmh <= STOP_SPEED_THRESHOLD_KMH) or (moved_distance < MIN_MOVEMENT_METERS)
-
-            if is_stopped:
-                # 이미 멈춰있던 상태면 기존 stopped_since 유지, 새로 멈췄으면 현재 시각 기록
-                stopped_since = prev_stopped_since if prev_stopped_since is not None else now_ts
-            else:
-                stopped_since = None
+        # 정지 기준점(anchor): 머무르기 시작한 위치와 시각.
+        # 직전 위치가 아니라 기준점과의 거리로 판단해야, 위치를 자주 보내는 도보 이동자
+        # (예: 5km/h, 3초 간격 → 1회 약 4m 이동)가 정지로 오판되지 않음
+        prev_anchor = prev_data.get("stopAnchor") if prev_data else None
+        if prev_anchor and calculate_haversine_distance(
+            prev_anchor["latitude"], prev_anchor["longitude"], latitude, longitude
+        ) < MIN_MOVEMENT_METERS:
+            anchor = prev_anchor
         else:
-            # 첫 진입 시 정지 상태 판정
-            if speed_kmh <= STOP_SPEED_THRESHOLD_KMH:
-                stopped_since = now_ts
+            # 첫 수신이거나 기준점에서 MIN_MOVEMENT_METERS 이상 벗어나면 현재 위치로 기준점 재설정
+            anchor = {"latitude": latitude, "longitude": longitude, "since": now_ts}
 
         # 3. 멈춤 시간(초 및 분) 계산 및 movementState 결정
-        no_movement_seconds = 0
+        no_movement_seconds = int(now_ts - anchor["since"])
         no_movement_minutes = 0
+        stopped_since: Optional[float] = None
 
         if is_arrived:
             movement_state = "ARRIVED"
-        elif stopped_since is not None:
-            no_movement_seconds = int(now_ts - stopped_since)
-            no_movement_minutes = no_movement_seconds // 60
-
-            if no_movement_seconds >= SUSPECTED_NOT_DEPARTED_SECONDS:
-                movement_state = "SUSPECTED_NOT_DEPARTED"
-            else:
-                movement_state = "STOPPED"
+        elif no_movement_seconds >= SUSPECTED_NOT_DEPARTED_SECONDS:
+            # 기준점 반경 안에 5분 이상 머묾 (GPS 속도 값이 튀어도 위치 기준으로 판정)
+            movement_state = "SUSPECTED_NOT_DEPARTED"
+        elif speed_kmh <= STOP_SPEED_THRESHOLD_KMH:
+            movement_state = "STOPPED"
         else:
             movement_state = "MOVING"
+
+        if movement_state in ("STOPPED", "SUSPECTED_NOT_DEPARTED"):
+            stopped_since = anchor["since"]
+            no_movement_minutes = no_movement_seconds // 60
 
         # 4. 예상 도착 시간(분)
         estimated_arrival_minutes = calculate_estimated_arrival_minutes(distance_meter, speed_kmh)
@@ -170,6 +161,7 @@ class GeoService:
             "movementState": movement_state,
             "noMovementMinutes": no_movement_minutes,
             "stoppedSince": stopped_since,
+            "stopAnchor": anchor,
             "updatedAt": now_iso,
             "isArrived": is_arrived,
         }
