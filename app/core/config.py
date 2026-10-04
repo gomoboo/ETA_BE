@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -23,13 +23,13 @@ class Settings(BaseSettings):
 
     # 실시간 레이더: 목적지 반경 이 거리(m) 안에 들어오면 자동 체크인 (WS-06 명세 30m)
     GEOFENCE_RADIUS_METERS: float = 30.0
+    # 같은 대상에게 다시 찌르기까지 기다려야 하는 시간(초)
+    POKE_COOLDOWN_SECONDS: int = 60
 
     # External APIs
     KAKAO_REST_API_KEY: Optional[str] = None
     FCM_SERVER_KEY: Optional[str] = None
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 settings = Settings()

@@ -29,6 +29,7 @@ class ErrorCode(Enum):
 
     # 찌르기 (Poke)
     POKE_NOT_FOUND = (404, "존재하지 않는 찌르기입니다.")
+    POKE_COOLDOWN = (429, "같은 친구는 잠시 후에 다시 찌를 수 있습니다.")
 
     # 정산 (Settlement)
     SETTLEMENT_NOT_READY = (409, "아직 정산할 수 없는 약속입니다.")

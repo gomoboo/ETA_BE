@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time import utcnow
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -25,7 +25,7 @@ class Warrant(Base):
     share_card_image_url = Column(String(500), nullable=True, comment="생성된 영장 카드 이미지 URL")
     share_link_url = Column(String(255), nullable=True, comment="웹 결과 공유 링크 URL")
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     # 관계 정의
     appointment = relationship("Appointment", back_populates="warrant")

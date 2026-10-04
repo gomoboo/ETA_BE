@@ -86,6 +86,7 @@
 | 409 | `SETTLEMENT_NOT_READY` | 아직 정산 조건이 안 됨, 취소된 약속 | 잠시 후 재시도 |
 | 409 | `RADAR_NOT_STARTED` | (웹소켓) 레이더 시작 전 위치 전송 | 시작 시각까지 대기 |
 | 409 | `CONFLICT` | (웹소켓) 이미 응답한 찌르기, 도착한 사람 찌르기 | 안내 |
+| 429 | `POKE_COOLDOWN` | (웹소켓) 같은 사람을 60초 안에 다시 찌름 | `message`의 남은 초 안내 |
 | 410 | `INVITE_LINK_EXPIRED` | 종료·취소됐거나 **약속 시간이 지난** 초대 링크 ⚠️ | "만료된 초대 링크" |
 | 502 | `KAKAO_API_ERROR` | 카카오 장소 검색 실패 | "잠시 후 다시 검색" |
 | 500 | `INTERNAL_SERVER_ERROR` | 서버 오류 | 공통 에러 화면 |
@@ -222,7 +223,7 @@ ws://{host}/api/v1/ws/appointments/{appointmentId}?participant_id={myParticipant
 | type | payload | 설명 |
 |---|---|---|
 | `location:update` | `latitude`, `longitude`, `speedKmh`(0 이상, 생략 시 0) | 몇 초 간격으로 계속 보냅니다(3~10초 권장) |
-| `poke:send` | `targetParticipantId` | 자기 자신·도착한 사람·다른 약속 참가자는 불가 |
+| `poke:send` | `targetParticipantId` | 자기 자신·도착한 사람·다른 약속 참가자는 불가. ⚠️ **같은 사람은 60초에 한 번**(`POKE_COOLDOWN`) |
 | `poke:respond` | `pokeId`, `action` | `action`은 **`NOW_DEPARTING`** 또는 **`DISMISSED`**, 한 번만 응답 가능 |
 
 ### 6.4 받는 이벤트 (Server → Client)
@@ -365,4 +366,3 @@ void respondPoke(WebSocketChannel channel, int pokeId, {required bool departing}
 | FCM 푸시(앱이 꺼져 있을 때 찌르기 알림) | 미구현 — 앱 실행 중에만 `poke:received` 수신 |
 | 영장 카드 이미지(`shareCardImageUrl`) | URL만 있고 이미지 없음 |
 | 외부 공유 웹페이지용 공개 조회 API | 미구현 — 정산·영장은 참여자만 조회 가능 |
-| 찌르기 횟수 제한 | 없음 |

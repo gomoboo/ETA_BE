@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time import utcnow
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from app.core.database import Base
 
@@ -14,5 +14,5 @@ class PokeLog(Base):
     target_participant_id = Column(Integer, ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, comment="찔린 사람 FK")
 
     response_action = Column(String(30), nullable=True, comment="응답 액션 (NOW_DEPARTING, DISMISSED, NO_RESPONSE)")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="찌르기 전송 일시")
+    created_at = Column(DateTime, default=utcnow, nullable=False, comment="찌르기 전송 일시")
     responded_at = Column(DateTime, nullable=True, comment="응답 일시")

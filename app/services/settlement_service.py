@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException, ErrorCode
+from app.core.time import utcnow
 from app.models import (
     Appointment,
     AppointmentStatus,
@@ -21,10 +22,6 @@ from app.models import (
 DEFAULT_CHARGE_TITLE = "침대 미출발 및 상습 지각죄"
 NO_SHOW_CHARGE_TITLE = "약속 장소 무단 미도착죄"
 
-
-def _utcnow() -> datetime:
-    # DB에는 UTC naive datetime으로 저장되어 있음
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 @dataclass
@@ -66,7 +63,7 @@ def _is_settlement_ready(appointment: Appointment, participants: list[Participan
         return True
     if participants and all(p.is_arrived for p in participants):
         return True
-    return _utcnow() >= appointment.meet_at + timedelta(minutes=settings.SETTLEMENT_TIMEOUT_MINUTES)
+    return utcnow() >= appointment.meet_at + timedelta(minutes=settings.SETTLEMENT_TIMEOUT_MINUTES)
 
 
 async def _get_joined_participants(db: AsyncSession, appointment_id: int) -> list[Participant]:

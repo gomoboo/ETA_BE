@@ -1,11 +1,11 @@
 import logging
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, ErrorCode
+from app.core.time import utcnow
 from app.core.websocket_manager import manager
 from app.models import Appointment, AppointmentStatus, JoinStatus, Participant, PenaltyType, User
 from app.services.appointment_service import calculate_radar_minutes
@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 ENDED_STATUSES = {AppointmentStatus.COMPLETED.value, AppointmentStatus.CANCELLED.value}
 LEAVE_MESSAGE = "약속에서 나갔습니다. 위치 공유가 중단되며 정산에서 제외됩니다."
 
-
-def _utcnow() -> datetime:
-    # DB에는 UTC naive datetime으로 저장되어 있음
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _format_minutes(minutes: int) -> str:
@@ -44,7 +40,7 @@ def build_radar_start_summary(appointment: Appointment) -> str:
 
 def _is_invite_expired(appointment: Appointment) -> bool:
     """종료/취소되었거나 약속 시간이 지난 약속은 초대 링크 만료 (FR-25)"""
-    return appointment.status in ENDED_STATUSES or _utcnow() >= appointment.meet_at
+    return appointment.status in ENDED_STATUSES or utcnow() >= appointment.meet_at
 
 
 async def get_appointment_by_invite_code(db: AsyncSession, invite_code: str) -> Appointment:
@@ -117,7 +113,7 @@ async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -
         raise AppException(ErrorCode.NOT_PARTICIPANT)
 
     participant.join_status = JoinStatus.LEFT.value
-    participant.left_at = _utcnow()
+    participant.left_at = utcnow()
     if participant.is_host:
         participant.is_host = False
         result = await db.execute(
