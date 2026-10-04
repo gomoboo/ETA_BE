@@ -1,4 +1,6 @@
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -6,13 +8,17 @@ from app.core.exception_handlers import register_exception_handlers
 from app.core.redis import init_redis_pool, close_redis_pool
 from app.api.v1.router import api_router
 
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # from_url()은 실제로 연결하지 않으므로 ping으로 연결 가능 여부를 확인 (실패해도 서버는 기동, 이후 요청 시 재연결)
     try:
-        await init_redis_pool()
+        redis = await init_redis_pool()
+        await redis.ping()
     except Exception as e:
-        print(f"[Warning] Redis connection failed on startup: {e}")
+        logger.warning("Redis connection failed on startup: %s", e)
     yield
     # Shutdown
     await close_redis_pool()
