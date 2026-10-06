@@ -288,6 +288,10 @@ ETA_BE/
 
 <div align="center">
 
-**Team gomoboo** · Backend [@Raewon12](https://github.com/Raewon12) [@leesk0007](https://github.com/leesk0007) · Frontend [@krot118](https://github.com/krot118)
+**Team gomoboo**
+
+| 🧭 PM · 기획 · 발표 | ⚙️ Backend | 📱 Frontend |
+|:---:|:---:|:---:|
+| [@dy401](https://github.com/dy401) | [@Raewon12](https://github.com/Raewon12) · [@leesk0007](https://github.com/leesk0007) | [@krot118](https://github.com/krot118) |
 
 </div>
