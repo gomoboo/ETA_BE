@@ -30,7 +30,7 @@ NO_SHOW_CHARGE_TITLE = "약속 장소 무단 미도착죄"
 class SettlementResult:
     appointment: Appointment
     participants: list[Participant]
-    warrant: Warrant | None
+    warrants: list[Warrant]  # 지각 시간이 긴 순서
 
     @property
     def total_fine_amount(self) -> int:
@@ -77,8 +77,14 @@ async def _get_joined_participants(db: AsyncSession, appointment_id: int) -> lis
     return list(result.scalars().all())
 
 
-async def _get_warrant(db: AsyncSession, appointment_id: int) -> Warrant | None:
-    return await db.scalar(select(Warrant).where(Warrant.appointment_id == appointment_id))
+async def _get_warrants(db: AsyncSession, appointment_id: int) -> list[Warrant]:
+    """지각 시간이 긴 순서, 같으면 먼저 참여한 사람 순서"""
+    result = await db.execute(
+        select(Warrant)
+        .where(Warrant.appointment_id == appointment_id)
+        .order_by(Warrant.late_minutes.desc(), Warrant.defendant_participant_id)
+    )
+    return list(result.scalars().all())
 
 
 async def _count_ignored_pokes(db: AsyncSession, participant_id: int) -> int:
@@ -107,30 +113,34 @@ def _build_final_penalty(appointment: Appointment, fine_amount: int) -> str:
     return appointment.penalty_content or ""
 
 
-async def _issue_warrant(
+async def _issue_warrants(
     db: AsyncSession, appointment: Appointment, participants: list[Participant]
-) -> Warrant | None:
-    """최다 지각자에게 영장 발부. 지각자가 없으면 발부하지 않음"""
-    late_participants = [p for p in participants if p.final_late_minutes > 0]
-    if not late_participants:
-        return None
-    # 지각 시간이 가장 긴 사람, 같으면 먼저 참여한 사람
-    defendant = max(late_participants, key=lambda p: (p.final_late_minutes, -p.id))
-    ignored_pokes = await _count_ignored_pokes(db, defendant.id)
-
-    warrant = Warrant(
-        appointment_id=appointment.id,
-        defendant_participant_id=defendant.id,
-        charge_title=NO_SHOW_CHARGE_TITLE if defendant.arrived_at is None else DEFAULT_CHARGE_TITLE,
-        late_minutes=defendant.final_late_minutes,
-        judgment_text=_build_judgment_text(defendant, defendant.final_late_minutes, ignored_pokes),
-        final_penalty=_build_final_penalty(appointment, defendant.final_fine_amount),
-        total_fine_amount=sum(p.final_fine_amount for p in participants),
+) -> list[Warrant]:
+    """지각자 전원에게 1장씩 영장 발부. 지각자가 없으면 빈 목록"""
+    # 지각 시간이 긴 순서, 같으면 먼저 참여한 사람 순서
+    defendants = sorted(
+        (p for p in participants if p.final_late_minutes > 0),
+        key=lambda p: (-p.final_late_minutes, p.id),
     )
-    db.add(warrant)
+    total_fine_amount = sum(p.final_fine_amount for p in participants)
+    warrants = []
+    for defendant in defendants:
+        ignored_pokes = await _count_ignored_pokes(db, defendant.id)
+        warrant = Warrant(
+            appointment_id=appointment.id,
+            defendant_participant_id=defendant.id,
+            charge_title=NO_SHOW_CHARGE_TITLE if defendant.arrived_at is None else DEFAULT_CHARGE_TITLE,
+            late_minutes=defendant.final_late_minutes,
+            judgment_text=_build_judgment_text(defendant, defendant.final_late_minutes, ignored_pokes),
+            final_penalty=_build_final_penalty(appointment, defendant.final_fine_amount),
+            total_fine_amount=total_fine_amount,
+        )
+        db.add(warrant)
+        warrants.append(warrant)
     await db.flush()  # id 발급 후 공유 URL 생성
-    warrant.share_card_image_url, warrant.share_link_url = _build_warrant_urls(warrant.id)
-    return warrant
+    for warrant in warrants:
+        warrant.share_card_image_url, warrant.share_link_url = _build_warrant_urls(warrant.id)
+    return warrants
 
 
 async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) -> SettlementResult:
@@ -146,10 +156,10 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) 
         raise AppException(ErrorCode.SETTLEMENT_NOT_READY, "취소된 약속은 정산할 수 없습니다.")
 
     # 영장이 발부됐으면 정산 확정 상태 → 저장된 결과 반환
-    warrant = await _get_warrant(db, appointment_id)
-    if warrant is not None:
+    warrants = await _get_warrants(db, appointment_id)
+    if warrants:
         await clear_location_cache(appointment_id)
-        return SettlementResult(appointment, participants, warrant)
+        return SettlementResult(appointment, participants, warrants)
 
     if not _is_settlement_ready(appointment, participants):
         raise AppException(ErrorCode.SETTLEMENT_NOT_READY)
@@ -158,7 +168,7 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) 
     for participant in participants:
         participant.final_late_minutes = calculate_late_minutes(appointment, participant)
         participant.final_fine_amount = calculate_fine_amount(appointment, participant.final_late_minutes)
-    warrant = await _issue_warrant(db, appointment, participants)
+    warrants = await _issue_warrants(db, appointment, participants)
     appointment.status = AppointmentStatus.COMPLETED.value
 
     try:
@@ -168,6 +178,6 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) 
         await db.rollback()
         await db.refresh(appointment)
         participants = await _get_joined_participants(db, appointment_id)
-        warrant = await _get_warrant(db, appointment_id)
+        warrants = await _get_warrants(db, appointment_id)
     await clear_location_cache(appointment_id)
-    return SettlementResult(appointment, participants, warrant)
+    return SettlementResult(appointment, participants, warrants)

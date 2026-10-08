@@ -28,6 +28,7 @@ class WarrantResponse(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     warrant_id: int
+    defendant_participant_id: int
     defendant_nickname: str
     charge_title: str
     late_minutes: int
@@ -35,3 +36,8 @@ class WarrantResponse(BaseModel):
     final_penalty: str
     share_card_image_url: Optional[str]
     share_link_url: Optional[str]
+
+
+class WarrantListResponse(BaseModel):
+    """[API-10] 지각자 전원의 영장 (지각 시간이 긴 순서)"""
+    warrants: list[WarrantResponse]

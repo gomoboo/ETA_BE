@@ -42,6 +42,10 @@ def warrant(client, appointment_id, guest_uuid="host"):
     return client.get(f"/api/v1/appointments/{appointment_id}/warrant", headers=auth(guest_uuid))
 
 
+def warrants(client, appointment_id, guest_uuid="host"):
+    return warrant(client, appointment_id, guest_uuid).json()["data"]["warrants"]
+
+
 def rows(data):
     return [(p["nickname"], p["arrivalStatus"], p["lateMinutes"], p["fineAmount"]) for p in data["participants"]]
 
@@ -60,23 +64,31 @@ def test_fee_settlement_after_timeout_with_no_show(client, db, setup):
     ]
     assert db.scalar("select status from appointments where id=?", appointment_id) == "COMPLETED"
 
-    w = warrant(client, appointment_id).json()["data"]
-    assert (w["defendantNickname"], w["chargeTitle"], w["lateMinutes"]) == ("민수", "약속 장소 무단 미도착죄", 60)
-    assert w["judgmentText"] == "약속 시간 60분이 지나도록 미도착 검거"
-    assert w["finalPenalty"] == "지각비 60,000원 납부"
-    assert w["shareLinkUrl"] == f"https://eta.app/result/warrant/{w['warrantId']}"
+    # 지각자 전원에게 발부, 지각 시간이 긴 순서
+    no_show, late = warrants(client, appointment_id)
+    assert (no_show["defendantNickname"], no_show["chargeTitle"], no_show["lateMinutes"]) == ("민수", "약속 장소 무단 미도착죄", 60)
+    assert no_show["judgmentText"] == "약속 시간 60분이 지나도록 미도착 검거"
+    assert no_show["finalPenalty"] == "지각비 60,000원 납부"
+    assert no_show["shareLinkUrl"] == f"https://eta.app/result/warrant/{no_show['warrantId']}"
+    assert (late["defendantNickname"], late["chargeTitle"], late["lateMinutes"]) == ("지원", "침대 미출발 및 상습 지각죄", 18)
+    assert late["judgmentText"] == "약속 시간 18분 초과 검거"
+    assert late["finalPenalty"] == "지각비 18,000원 납부"
+    assert late["shareCardImageUrl"] == f"https://eta.app/cards/warrant_{late['warrantId']}.png"
+    assert no_show["warrantId"] != late["warrantId"]
 
 
 def test_settlement_is_fixed_once_warrant_issued(client, db, setup):
     appointment_id, meet_at = setup(61, penaltyType="FEE", finePerMinute=1000)
     first = settlement(client, appointment_id).json()["data"]
-    warrant_id = warrant(client, appointment_id).json()["data"]["warrantId"]
+    issued = warrants(client, appointment_id)
+    # 전원 미도착(60분)으로 동률이면 먼저 참여한 순서
+    assert [w["defendantNickname"] for w in issued] == ["지민", "지원", "민수"]
 
     arrive(db, appointment_id, "u3", meet_at + timedelta(minutes=5), "LATE")  # 확정 후 데이터 변경
 
     assert settlement(client, appointment_id).json()["data"]["totalFineAmount"] == first["totalFineAmount"]
-    assert warrant(client, appointment_id).json()["data"]["warrantId"] == warrant_id
-    assert db.scalar("select count(*) from warrants") == 1
+    assert warrants(client, appointment_id) == issued
+    assert db.scalar("select count(*) from warrants") == 3
 
 
 def test_penalty_settlement_when_all_arrived_counts_ignored_pokes(client, db, setup):
@@ -101,7 +113,7 @@ def test_penalty_settlement_when_all_arrived_counts_ignored_pokes(client, db, se
     assert data["totalFineAmount"] == 0
     assert rows(data)[1] == ("지원", "LATE", 5, 0)
 
-    w = warrant(client, appointment_id, "u3").json()["data"]
+    [w] = warrants(client, appointment_id, "u3")  # 지각자 1명이면 영장 1장
     assert (w["defendantNickname"], w["chargeTitle"]) == ("지원", "침대 미출발 및 상습 지각죄")
     assert w["judgmentText"] == "약속 시간 5분 초과 및 찌르기 2회 무시 검거"
     assert w["finalPenalty"] == "커피 쏘기"
@@ -127,7 +139,9 @@ def test_completed_status_set_elsewhere_is_still_calculated(client, db, setup):
 
     data = settlement(client, appointment_id).json()["data"]
     assert data["totalFineAmount"] == 6500
-    assert warrant(client, appointment_id).json()["data"]["defendantNickname"] == "지원"
+    assert [(w["defendantNickname"], w["lateMinutes"]) for w in warrants(client, appointment_id)] == [
+        ("지원", 10), ("민수", 3),
+    ]
 
 
 def test_arrival_status_without_is_arrived_is_not_arrived(client, db, setup):

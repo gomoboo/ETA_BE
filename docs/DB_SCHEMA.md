@@ -13,7 +13,7 @@ erDiagram
     users ||--o{ appointments : "생성/주최 (host)"
     users ||--o{ participants : "약속 참여"
     appointments ||--o{ participants : "참가자 목록"
-    appointments ||--o| warrants : "1:1 정산/영장 발부"
+    appointments ||--o{ warrants : "1:N 지각자당 영장 발부"
     participants ||--o{ poke_logs : "찌르기 발신"
     participants ||--o{ poke_logs : "찌르기 수신"
 
@@ -80,8 +80,8 @@ erDiagram
 
     warrants {
         bigint id PK "영장 고유 ID"
-        bigint appointment_id FK "소속 약속 ID (1:1)"
-        bigint defendant_participant_id FK "피고인(최다 지각자) ID"
+        bigint appointment_id FK "소속 약속 ID"
+        bigint defendant_participant_id FK "피고인(지각자) ID"
         string charge_title "죄명 (예: 침대 미출발 및 상습 지각죄)"
         int late_minutes "피고인 지각 시간 (분)"
         text judgment_text "판결문 (찌르기 무시 횟수 포함)"
@@ -187,14 +187,15 @@ erDiagram
 ---
 
 ### 2.5. `warrants` (지각 체포 영장 및 정산)
-* **목적**: 약속 종료 후 최다 지각자에게 발부되는 판결문 카드 데이터 및 정산 총합을 저장합니다.
+* **목적**: 약속 종료 후 지각자마다 1장씩 발부되는 판결문 카드 데이터 및 정산 총합을 저장합니다.
+* **제약**: `UNIQUE(appointment_id, defendant_participant_id)` — 같은 지각자에게 영장이 두 번 발부되지 않습니다.
 * **관련 API**: `[API-09] 정산 결과 조회`, `[API-10] 지각 체포 영장 및 결과 카드 조회`
 
 | 컬럼명 (Physical) | 데이터 타입 | 제약 조건 | 기본값 | 설명 및 비고 |
 | :--- | :--- | :---: | :---: | :--- |
 | `id` | `BIGINT` | PK, AUTO_INCREMENT | - | 영장 고유 식별 번호 (`warrantId`) |
-| `appointment_id` | `BIGINT` | FK (appointments.id), NOT NULL, UNIQUE | - | 대상 약속 ID (1:1 매핑) |
-| `defendant_participant_id`| `BIGINT` | FK (participants.id), NULL | - | 피고인(최다 지각자) ID |
+| `appointment_id` | `BIGINT` | FK (appointments.id), NOT NULL, INDEX | - | 대상 약속 ID (1:N, 지각자당 1장) |
+| `defendant_participant_id`| `BIGINT` | FK (participants.id), NULL | - | 피고인(지각자) ID |
 | `charge_title` | `VARCHAR(100)` | NOT NULL | `'침대 미출발 및 상습 지각죄'` | 죄명 (미도착자는 `'약속 장소 무단 미도착죄'`) |
 | `late_minutes` | `INT` | NOT NULL | `0` | 피고인 지각 시간 (분) |
 | `judgment_text` | `TEXT` | NOT NULL | - | 판결문 (예: `약속 시간 18분 초과 및 찌르기 2회 무시 검거`) |
