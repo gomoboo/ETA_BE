@@ -9,6 +9,7 @@ from app.core.time import utcnow
 from app.core.websocket_manager import manager
 from app.models import Appointment, AppointmentStatus, JoinStatus, Participant, PenaltyType, User
 from app.services.appointment_service import calculate_radar_minutes
+from app.services.location_cleanup_service import clear_location_cache
 from app.services.user_service import validate_nickname
 
 logger = logging.getLogger(__name__)
@@ -135,4 +136,8 @@ async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -
 
     await db.commit()
     await _close_location_socket(appointment_id, participant.id)
+    if appointment.status == AppointmentStatus.CANCELLED.value:
+        await clear_location_cache(appointment_id)
+    else:
+        await clear_location_cache(appointment_id, participant.id)
     return participant

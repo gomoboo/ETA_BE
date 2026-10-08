@@ -161,3 +161,26 @@ def test_completed_appointment_disappears_from_home(client, setup):
     settlement(client, appointment_id)
     data = client.get("/api/v1/appointments/home", headers=auth("host")).json()["data"]
     assert data == {"activeAppointments": [], "upcomingAppointments": []}
+
+
+@pytest.mark.parametrize("cached_warrant", [False, True])
+def test_settlement_clears_location_cache(client, setup, fake_redis, cached_warrant):
+    aid, _ = setup(61)
+    if cached_warrant:
+        assert settlement(client, aid).status_code == 200
+    key = f"eta:appointment:{aid}:locations"
+    client.portal.call(fake_redis.hset, key, "1", "stale")
+    assert settlement(client, aid).status_code == 200
+    assert client.portal.call(fake_redis.exists, key) == 0
+
+
+def test_settlement_succeeds_when_redis_cleanup_fails(client, db, setup, monkeypatch, caplog):
+    from redis.exceptions import ConnectionError
+    from app.services.geo_service import GeoService
+    aid, _ = setup(61)
+    async def fail(*args, **kwargs):
+        raise ConnectionError("test outage")
+    monkeypatch.setattr(GeoService, "clear_appointment_cache", fail)
+    assert settlement(client, aid).status_code == 200
+    assert db.scalar("select status from appointments where id=?", aid) == "COMPLETED"
+    assert "location cache" in caplog.text

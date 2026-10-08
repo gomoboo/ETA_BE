@@ -284,3 +284,129 @@ def test_poke_validation(client, db, room):
             assert ws.receive_json()["code"] == code
         ws.send_json({"type": "poke:respond", "pokeId": 1, "action": "IGNORE"})
         assert ws.receive_json()["code"] == "INVALID_INPUT"
+
+
+# ---------- 위치 공유 개인정보 보호 회귀 테스트 (#42, #43, #44) ----------
+
+def cache_key(appointment_id):
+    return f"eta:appointment:{appointment_id}:locations"
+
+
+def test_location_requires_consent(client, db, room, onboard, fake_redis):
+    aid, pids = room()
+    onboard("host", locationTermsAgreed=False)
+    assert client.get(f"/api/v1/appointments/{aid}", headers=auth("host")).status_code == 200
+    with connect(client, aid, pids["host"], "host") as ws:
+        ws.send_json(location(FAR_2KM))
+        assert ws.receive_json().get("code") == "LOCATION_CONSENT_REQUIRED"
+        assert client.portal.call(fake_redis.exists, cache_key(aid)) == 0
+        assert db.scalar("select status from appointments where id=?", aid) == "SCHEDULED"
+        onboard("host", locationTermsAgreed=True)
+        ws.send_json(location(FAR_2KM))
+        assert ws.receive_json()["type"] == "map:sync"
+
+
+def test_withdrawal_removes_cache_and_blocks_existing_socket(client, room, onboard, fake_redis):
+    aid, pids = room()
+    with connect(client, aid, pids["host"], "host") as ws:
+        ws.send_json(location(FAR_2KM))
+        ws.receive_json()
+        onboard("host", locationTermsAgreed=False)
+        assert client.portal.call(fake_redis.hget, cache_key(aid), str(pids["host"])) is None
+        ws.send_json(location(FAR_2KM))
+        assert ws.receive_json().get("code") == "LOCATION_CONSENT_REQUIRED"
+        assert client.portal.call(fake_redis.exists, cache_key(aid)) == 0
+
+
+def test_arrived_location_is_frozen_but_socket_receives_other_locations(client, db, room, fake_redis):
+    aid, pids = room(meet_in_minutes=-3, penaltyType="FEE", finePerMinute=1000, penaltyContent=None)
+    with connect(client, aid, pids["host"], "host") as host, connect(client, aid, pids["u2"], "u2") as other:
+        host.send_json(location(NEAR_10M))
+        for ws in (host, other):
+            assert ws.receive_json()["type"] == "checkin:completed"
+            assert ws.receive_json()["type"] == "map:sync"
+        cached = client.portal.call(fake_redis.hget, cache_key(aid), str(pids["host"]))
+        saved = db.fetchone("select arrived_at, final_late_minutes, final_fine_amount from participants where id=?", pids["host"])
+        host.send_json(location(FAR_2KM, speed=50))
+        assert host.receive_json().get("code") == "LOCATION_SHARING_ENDED"
+        assert client.portal.call(fake_redis.hget, cache_key(aid), str(pids["host"])) == cached
+        assert db.fetchone("select arrived_at, final_late_minutes, final_fine_amount from participants where id=?", pids["host"]) == saved
+        other.send_json(location(FAR_2KM))
+        synced = host.receive_json()
+        me = next(p for p in synced["participants"] if p["participantId"] == pids["host"])
+        assert (me["latitude"], me["longitude"], me["distanceMeter"], me["speedKmh"]) == (*NEAR_10M, 0, 0)
+        assert other.receive_json()["type"] == "map:sync"
+
+
+def test_leave_removes_only_leaver_cache_and_rejoin_does_not_restore_it(client, db, room, fake_redis, join):
+    aid, pids = room()
+    for guest in ("host", "u2"):
+        with connect(client, aid, pids[guest], guest) as ws:
+            ws.send_json(location(FAR_2KM))
+            ws.receive_json()
+    key = cache_key(aid)
+    other = client.portal.call(fake_redis.hget, key, str(pids["u2"]))
+    assert client.post(f"/api/v1/appointments/{aid}/leave", headers=auth("host")).status_code == 200
+    assert client.portal.call(fake_redis.hget, key, str(pids["host"])) is None
+    assert client.portal.call(fake_redis.hget, key, str(pids["u2"])) == other
+    assert join("host", db.scalar("select invite_code from appointments where id=?", aid)).status_code == 200
+    assert client.portal.call(fake_redis.hget, key, str(pids["host"])) is None
+
+
+def test_cancel_clears_entire_cache_including_stale_participants(client, db, room, fake_redis):
+    aid, pids = room()
+    client.portal.call(fake_redis.hset, cache_key(aid), "999", "stale")
+    for guest in ("host", "u2", "u3"):
+        assert client.post(f"/api/v1/appointments/{aid}/leave", headers=auth(guest)).status_code == 200
+    assert db.scalar("select status from appointments where id=?", aid) == "CANCELLED"
+    assert client.portal.call(fake_redis.exists, cache_key(aid)) == 0
+
+
+def test_completion_sends_final_map_then_clears_cache(client, room, fake_redis):
+    aid, pids = room()
+    for guest in ("host", "u2", "u3"):
+        with connect(client, aid, pids[guest], guest) as ws:
+            ws.send_json(location(NEAR_10M))
+            assert ws.receive_json()["type"] == "checkin:completed"
+            synced = ws.receive_json()
+            assert len(synced["participants"]) == ("host", "u2", "u3").index(guest) + 1
+            assert all(p["movementState"] == "ARRIVED" for p in synced["participants"])
+    assert client.portal.call(fake_redis.exists, cache_key(aid)) == 0
+
+
+def test_leave_succeeds_when_redis_cleanup_fails(client, db, room, monkeypatch, caplog):
+    from redis.exceptions import ConnectionError
+    from app.services.geo_service import GeoService
+    aid, _ = room()
+    async def fail(*args, **kwargs):
+        raise ConnectionError("test outage")
+    monkeypatch.setattr(GeoService, "remove_participant_location", fail, raising=False)
+    assert client.post(f"/api/v1/appointments/{aid}/leave", headers=auth("host")).status_code == 200
+    assert db.scalar("select join_status from participants where appointment_id=? and user_id=(select id from users where guest_uuid='host')", aid) == "LEFT"
+    assert "location cache" in caplog.text
+
+
+def test_withdrawal_clears_all_joined_rooms(client, room, onboard, fake_redis):
+    rooms = [room(), room()]
+    for aid, pids in rooms:
+        client.portal.call(fake_redis.hset, cache_key(aid), str(pids["host"]), "stale")
+    onboard("host", locationTermsAgreed=False)
+    for aid, pids in rooms:
+        assert client.portal.call(fake_redis.hget, cache_key(aid), str(pids["host"])) is None
+
+
+def test_withdrawn_location_not_broadcast_when_cleanup_fails(client, room, onboard, fake_redis, monkeypatch):
+    from redis.exceptions import ConnectionError
+    from app.services.geo_service import GeoService
+    aid, pids = room()
+    with connect(client, aid, pids["host"], "host") as ws:
+        ws.send_json(location(FAR_2KM))
+        ws.receive_json()
+    async def fail(*args, **kwargs):
+        raise ConnectionError("test outage")
+    monkeypatch.setattr(GeoService, "remove_participant_location", fail)
+    onboard("host", locationTermsAgreed=False)
+    assert client.portal.call(fake_redis.hget, cache_key(aid), str(pids["host"])) is not None
+    with connect(client, aid, pids["u2"], "u2") as ws:
+        ws.send_json(location(FAR_2KM))
+        assert [p["participantId"] for p in ws.receive_json()["participants"]] == [pids["u2"]]

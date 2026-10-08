@@ -75,6 +75,8 @@
 | 400 | `INVALID_INPUT` | 필수값 누락, 형식 오류, 검증 실패 | `data[].reason` 표시 |
 | 400 | `INVALID_NICKNAME_LENGTH` | 닉네임 2~10자 위반 (앞뒤 공백 제외 후) | 닉네임 입력란 에러 |
 | 401 | `UNAUTHORIZED` | `X-Guest-UUID` 헤더 없음 | UUID 저장 로직 확인 |
+| 403 | `LOCATION_CONSENT_REQUIRED` | (웹소켓) 위치 동의 없이 전송 | 동의 화면 안내, 위치 전송 중단 |
+| 409 | `LOCATION_SHARING_ENDED` | (웹소켓) 체크인 이후 위치 전송 | 위치 전송 중단, 지도 수신 유지 |
 | 403 | `NOT_PARTICIPANT` | 참여하지 않은(또는 나간) 약속에 접근 | 홈으로 이동 |
 | 404 | `USER_NOT_FOUND` | 온보딩하지 않은 UUID | 온보딩 화면으로 |
 | 404 | `APPOINTMENT_NOT_FOUND` | 없는 약속 | 안내 후 홈으로 |
@@ -121,6 +123,8 @@
 { "userId": 101, "nickname": "지민", "locationTermsAgreed": true }
 ```
 - `guestUuid`, `nickname`만 필수입니다. 같은 UUID로 다시 호출하면 **정보를 갱신**합니다(닉네임 변경에도 사용 가능).
+- 새 사용자가 `locationTermsAgreed`를 생략하면 **미동의(false)**입니다. 동의한 경우 명시적으로 `true`를 보내세요. 기존 사용자 갱신에서 생략하면 기존 동의 상태를 유지합니다.
+- `false`로 철회하면 참여 중인 약속의 위치 캐시를 삭제하고, 연결 중인 소켓에서도 이후 위치 전송을 차단합니다. 미동의여도 REST 기능과 지도 수신은 사용할 수 있습니다.
 - 갱신할 때 `profileCharacter`, `fcmToken`을 생략하면 기존 값을 유지합니다.
 - 닉네임은 앞뒤 공백을 제거한 뒤 2~10자인지 검사합니다.
 
@@ -177,7 +181,7 @@
 - ⚠️ **`myParticipantId`**(명세 외 추가 필드): 요청한 **내 `participantId`**입니다. 웹소켓 접속에 이 값을 쓰세요. 방장은 약속 생성 응답에 `participantId`가 없어서 여기서 받아야 합니다.
 
 ### [API-08] 약속 나가기 — `POST /appointments/{appointmentId}/leave`
-- 나가면 **웹소켓 연결이 서버에서 끊기고** 정산에서 제외됩니다.
+- 나가면 **웹소켓 연결이 서버에서 끊기고** 정산에서 제외되며, 해당 참가자의 위치 캐시를 삭제합니다. 마지막 참가자가 나가 약속이 취소되면 방 전체 위치 캐시를 삭제합니다.
 - ⚠️ 방장이 나가면 **가장 먼저 참여한 사람이 새 방장**이 됩니다. 아무도 안 남으면 약속이 **취소(`CANCELLED`)**됩니다.
 - 종료·취소된 약속에서는 `409 APPOINTMENT_ALREADY_ENDED`
 
@@ -255,7 +259,8 @@ ws://{host}/api/v1/ws/appointments/{appointmentId}?participant_id={myParticipant
 
 **`checkin:completed`** — 명세와 같습니다.
 - ⚠️ `arrivalStatus` 기준: 약속 **1분 전보다 일찍** 도착하면 `EARLY`, **1분 이상 늦으면** `LATE`, 그 사이는 `ON_TIME`
-- 이 메시지 바로 뒤에 `map:sync`가 이어서 옵니다.
+- 이 메시지 바로 뒤에 `map:sync`가 이어서 옵니다. 체크인한 본인의 위치 전송을 중단하세요. 이후 전송은 `LOCATION_SHARING_ENDED`로 거부되며, 첫 체크인 좌표와 도착 시각은 고정됩니다. 다른 참가자의 지도 메시지는 계속 수신할 수 있습니다.
+- 전원 체크인 시 마지막 `map:sync`를 보낸 뒤 방 전체 위치 캐시를 삭제합니다. 정산 완료 시에도 전체 캐시를 삭제합니다.
 - **전원이 체크인하면 약속이 완료(`COMPLETED`)**되고, 이후 위치 전송은 `APPOINTMENT_ALREADY_ENDED` 에러가 납니다. 이때 정산 화면(API-09)으로 이동하세요.
 
 ---

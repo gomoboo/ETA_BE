@@ -238,6 +238,15 @@ class GeoService:
         return None
 
     @classmethod
+    async def remove_participant_location(
+        cls, appointment_id: int, participant_id: int, redis: Optional[Redis] = None
+    ) -> None:
+        """나가거나 위치 동의를 철회한 참가자의 위치만 삭제합니다."""
+        if redis is None:
+            redis = await get_redis()
+        await redis.hdel(cls._get_appointment_locations_key(appointment_id), str(participant_id))
+
+    @classmethod
     async def clear_appointment_cache(
         cls,
         appointment_id: int,

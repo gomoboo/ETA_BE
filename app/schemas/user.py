@@ -11,7 +11,7 @@ class OnboardingRequest(BaseModel):
     # 닉네임 길이(2~10자)는 INVALID_NICKNAME_LENGTH로 응답하기 위해 서비스에서 검증
     nickname: str = Field(..., description="닉네임 (2~10자)")
     profile_character: Optional[str] = Field(None, max_length=50, description="프로필 캐릭터 ID")
-    location_terms_agreed: bool = Field(True, description="위치 정보 수집/이용 약관 동의 여부")
+    location_terms_agreed: bool = Field(False, description="위치 정보 수집/이용 약관 동의 여부")
     notification_allowed: bool = Field(True, description="푸시 알림 수신 동의 여부")
     fcm_token: Optional[str] = Field(None, max_length=255, description="FCM 디바이스 토큰")
 

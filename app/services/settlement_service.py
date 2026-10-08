@@ -19,6 +19,8 @@ from app.models import (
     Warrant,
 )
 
+from app.services.location_cleanup_service import clear_location_cache
+
 DEFAULT_CHARGE_TITLE = "침대 미출발 및 상습 지각죄"
 NO_SHOW_CHARGE_TITLE = "약속 장소 무단 미도착죄"
 
@@ -146,6 +148,7 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) 
     # 영장이 발부됐으면 정산 확정 상태 → 저장된 결과 반환
     warrant = await _get_warrant(db, appointment_id)
     if warrant is not None:
+        await clear_location_cache(appointment_id)
         return SettlementResult(appointment, participants, warrant)
 
     if not _is_settlement_ready(appointment, participants):
@@ -166,4 +169,5 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: int) 
         await db.refresh(appointment)
         participants = await _get_joined_participants(db, appointment_id)
         warrant = await _get_warrant(db, appointment_id)
+    await clear_location_cache(appointment_id)
     return SettlementResult(appointment, participants, warrant)

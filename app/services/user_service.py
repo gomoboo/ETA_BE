@@ -3,7 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, ErrorCode
-from app.models import User
+from app.models import JoinStatus, Participant, User
+from app.services.location_cleanup_service import clear_location_cache
 from app.schemas.user import OnboardingRequest
 
 NICKNAME_MIN_LENGTH = 2
@@ -19,7 +20,8 @@ def validate_nickname(nickname: str) -> str:
 
 def _apply_onboarding(user: User, request: OnboardingRequest, nickname: str) -> None:
     user.nickname = nickname
-    user.location_terms_agreed = request.location_terms_agreed
+    if "location_terms_agreed" in request.model_fields_set:
+        user.location_terms_agreed = request.location_terms_agreed
     user.notification_allowed = request.notification_allowed
     # 선택 값은 전달된 경우에만 갱신
     if request.profile_character is not None:
@@ -55,4 +57,10 @@ async def onboard_user(db: AsyncSession, request: OnboardingRequest) -> User:
         await db.commit()
 
     await db.refresh(user)
+    if not user.location_terms_agreed:
+        participants = await db.scalars(select(Participant).where(
+            Participant.user_id == user.id, Participant.join_status == JoinStatus.JOINED.value
+        ))
+        for participant in participants:
+            await clear_location_cache(participant.appointment_id, participant.id)
     return user

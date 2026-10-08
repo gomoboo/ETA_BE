@@ -10,7 +10,7 @@ def test_onboarding_creates_user(client, db):
     )
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data == {"userId": data["userId"], "nickname": "지민", "locationTermsAgreed": True}
+    assert data == {"userId": data["userId"], "nickname": "지민", "locationTermsAgreed": False}
     assert db.fetchone("select profile_character, fcm_token from users where guest_uuid='dev-1'") == ("char_cat", "tok")
 
 
@@ -50,3 +50,15 @@ def test_guest_uuid_header_is_case_insensitive(client, onboard):
     onboard("dev-1")
     response = client.get("/api/v1/appointments/home", headers={"x-guest-uuid": "dev-1"})
     assert response.status_code == 200
+
+
+def test_omitted_consent_does_not_restore_withdrawn_consent(client, onboard):
+    onboard("dev-1", locationTermsAgreed=False)
+    response = client.post("/api/v1/users/onboarding", json={"guestUuid": "dev-1", "nickname": "지민이"})
+    assert response.json()["data"]["locationTermsAgreed"] is False
+
+
+def test_omitted_consent_preserves_existing_agreement(client, onboard):
+    onboard("dev-1", locationTermsAgreed=True)
+    response = client.post("/api/v1/users/onboarding", json={"guestUuid": "dev-1", "nickname": "지민이"})
+    assert response.json()["data"]["locationTermsAgreed"] is True

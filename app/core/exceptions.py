@@ -25,6 +25,8 @@ class ErrorCode(Enum):
     ALREADY_JOINED = (409, "이미 참여 중인 약속입니다.")
     NOT_PARTICIPANT = (403, "해당 약속의 참가자가 아닙니다.")
     APPOINTMENT_ALREADY_ENDED = (409, "이미 종료되었거나 취소된 약속입니다.")
+    LOCATION_CONSENT_REQUIRED = (403, "위치 정보 수집/이용 동의가 필요합니다.")
+    LOCATION_SHARING_ENDED = (409, "도착 후에는 위치를 전송할 수 없습니다.")
     RADAR_NOT_STARTED = (409, "아직 위치 공유(레이더)가 시작되지 않았습니다.")
 
     # 찌르기 (Poke)
