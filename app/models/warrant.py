@@ -1,17 +1,21 @@
 from app.core.time import utcnow
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class Warrant(Base):
     """
     [API-10] 지각 체포 영장 및 결과 카드 엔티티
-    약속 종료 후 최대 지각자에게 발부되는 재미 요소 겸 결과 요약입니다.
+    약속 종료 후 지각자마다 1장씩 발부되는 재미 요소 겸 결과 요약입니다.
     """
     __tablename__ = "warrants"
+    __table_args__ = (
+        # 동시 정산 요청에도 같은 지각자에게 영장이 두 번 발부되지 않도록
+        UniqueConstraint("appointment_id", "defendant_participant_id", name="uq_warrants_appointment_defendant"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="영장 고유 식별자 PK")
-    appointment_id = Column(Integer, ForeignKey("appointments.id", ondelete="CASCADE"), unique=True, nullable=False, comment="대상 약속 FK (1:1)")
+    appointment_id = Column(Integer, ForeignKey("appointments.id", ondelete="CASCADE"), index=True, nullable=False, comment="대상 약속 FK (1:N, 지각자당 1장)")
     defendant_participant_id = Column(Integer, ForeignKey("participants.id", ondelete="SET NULL"), nullable=True, comment="피고인(지각자) 참가자 FK")
 
     # 영장 세부 내용
@@ -28,5 +32,5 @@ class Warrant(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
     # 관계 정의
-    appointment = relationship("Appointment", back_populates="warrant")
+    appointment = relationship("Appointment", back_populates="warrants")
     defendant = relationship("Participant")

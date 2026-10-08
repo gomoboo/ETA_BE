@@ -193,7 +193,9 @@
 - `arrivalStatus`: `EARLY` / `ON_TIME` / `LATE` / `NOT_ARRIVED`(미도착)
 
 ### [API-10] 지각 체포 영장 — `GET /appointments/{appointmentId}/warrant`
-- 지각 시간이 가장 긴 사람이 대상입니다. **지각자가 없으면 `404 WARRANT_NOT_FOUND`** → "전원 정시 도착" 화면으로 처리하세요.
+- ⚠️ **지각자 전원에게 1장씩 발부**합니다. 응답은 `{"warrants": [...]}` 목록이고 **지각 시간이 긴 순서**(같으면 먼저 참여한 순서)입니다. 첫 번째가 최다 지각자입니다.
+- 각 영장에 `defendantParticipantId`가 있어서 참가자 목록과 연결할 수 있습니다. 공유 링크(`shareLinkUrl`)도 영장마다 다릅니다.
+- **지각자가 없으면 `404 WARRANT_NOT_FOUND`** → "전원 정시 도착" 화면으로 처리하세요.
 - 미도착자가 대상이면 `chargeTitle`이 `"약속 장소 무단 미도착죄"`입니다.
 - `judgmentText` 예: `"약속 시간 18분 초과 및 찌르기 2회 무시 검거"`
 - ⚠️ `shareCardImageUrl`은 **URL 형식만 있고 실제 이미지는 아직 생성되지 않습니다.** 당분간 카드는 앱에서 직접 그려주세요.

@@ -57,4 +57,4 @@ class Appointment(Base):
 
     # 관계 정의
     participants = relationship("Participant", back_populates="appointment", cascade="all, delete-orphan")
-    warrant = relationship("Warrant", back_populates="appointment", uselist=False, cascade="all, delete-orphan")
+    warrants = relationship("Warrant", back_populates="appointment", cascade="all, delete-orphan")
