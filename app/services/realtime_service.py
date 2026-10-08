@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.schemas.websocket import LocationUpdatePayload, PokeRespondPayload, PokeSendPayload
 from app.services.geo_service import GeoService, is_within_geofence
+from app.services.location_cleanup_service import clear_location_cache
 from app.services.settlement_service import calculate_fine_amount, calculate_late_minutes
 
 logger = logging.getLogger(__name__)
@@ -111,10 +112,15 @@ async def build_map_sync(db: AsyncSession, appointment: Appointment) -> dict:
     """[WS-02] map:sync 메시지 구성 (위치를 한 번 이상 보낸 참여 중 참가자만 포함)"""
     now = utcnow()
     locations = await GeoService.get_all_participants_locations(appointment.id)
+    consented_ids = set((await db.scalars(
+        select(Participant.id).join(User).where(
+            Participant.appointment_id == appointment.id, User.location_terms_agreed.is_(True)
+        )
+    )).all())
     participants = []
     for participant in await _joined_participants(db, appointment.id):
         location = locations.get(participant.id)
-        if location is None:
+        if location is None or participant.id not in consented_ids:
             continue
         late_seconds = _late_elapsed_seconds(appointment, participant, now)
         participants.append({
@@ -145,6 +151,13 @@ async def handle_location_update(
     if payload.appointment_id not in (None, appointment.id) or payload.participant_id not in (None, participant.id):
         raise AppException(ErrorCode.INVALID_INPUT, "연결 정보와 appointmentId/participantId가 일치하지 않습니다.")
 
+    user = await db.get(User, participant.user_id)
+    if user is None or not user.location_terms_agreed:
+        await clear_location_cache(appointment.id, participant.id)
+        raise AppException(ErrorCode.LOCATION_CONSENT_REQUIRED)
+    if participant.is_arrived:
+        raise AppException(ErrorCode.LOCATION_SHARING_ENDED)
+
     now = utcnow()
     if appointment.status != AppointmentStatus.RADAR_ACTIVE.value:
         if now < appointment.radar_start_at:
@@ -163,14 +176,19 @@ async def handle_location_update(
         target_lng=appointment.target_longitude,
     )
 
-    if not participant.is_arrived and is_within_geofence(
-        payload.latitude, payload.longitude,
-        appointment.target_latitude, appointment.target_longitude,
-        radius_meters=settings.GEOFENCE_RADIUS_METERS,
-    ):
-        await checkin_participant(db, appointment, participant, now)
+    try:
+        if is_within_geofence(
+            payload.latitude, payload.longitude,
+            appointment.target_latitude, appointment.target_longitude,
+            radius_meters=settings.GEOFENCE_RADIUS_METERS,
+        ):
+            await checkin_participant(db, appointment, participant, now)
 
-    await manager.broadcast_to_appointment(appointment.id, await build_map_sync(db, appointment))
+        await manager.broadcast_to_appointment(appointment.id, await build_map_sync(db, appointment))
+    finally:
+        # 마지막 checkin:completed와 map:sync를 보낸 뒤 전체 위치를 삭제한다.
+        if appointment.status == AppointmentStatus.COMPLETED.value:
+            await clear_location_cache(appointment.id)
 
 
 # ---------- [WS-06] 자동 체크인 ----------

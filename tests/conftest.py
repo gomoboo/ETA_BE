@@ -80,7 +80,7 @@ def onboard(client):
     def _onboard(guest_uuid: str, nickname: str = "지민", **fields) -> dict:
         response = client.post(
             "/api/v1/users/onboarding",
-            json={"guestUuid": guest_uuid, "nickname": nickname, **fields},
+            json={"guestUuid": guest_uuid, "nickname": nickname, "locationTermsAgreed": True, **fields},
         )
         assert response.status_code == 200, response.json()
         return response.json()["data"]

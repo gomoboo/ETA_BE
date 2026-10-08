@@ -14,7 +14,7 @@ class User(Base):
     guest_uuid = Column(String(64), unique=True, index=True, nullable=False, comment="클라이언트 기기 고유 UUID")
     nickname = Column(String(20), nullable=False, comment="사용자 닉네임 (2~10자)")
     profile_character = Column(String(50), nullable=False, default="char_rabbit", comment="선택한 프로필 캐릭터 ID")
-    location_terms_agreed = Column(Boolean, nullable=False, default=True, comment="위치 정보 수집 약관 동의 여부")
+    location_terms_agreed = Column(Boolean, nullable=False, default=False, comment="위치 정보 수집 약관 동의 여부")
     notification_allowed = Column(Boolean, nullable=False, default=True, comment="FCM 푸시 알림 허용 여부")
     fcm_token = Column(String(255), nullable=True, comment="푸시 알림 전송용 FCM 기기 토큰")
 
