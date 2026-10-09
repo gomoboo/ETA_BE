@@ -49,3 +49,16 @@ create_proposal_docx.py
 # AI Agent Configs
 AGENTS.md
 
+
+# Infrastructure: state, machine-specific settings and secrets
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+*.tfbackend
+crash.log
+.env.*
+!.env.example
+!**/.env.example

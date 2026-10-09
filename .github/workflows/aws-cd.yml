@@ -1,0 +1,88 @@
+name: AWS simple CD
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Full commit SHA of an image already published to ECR
+        type: string
+        required: true
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: eta-aws-cd
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      vars.AWS_ROLE_ARN != '' && vars.ECR_REPOSITORY != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image_tag: ${{ steps.image.outputs.tag }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      IMAGE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Publish immutable image
+        id: image
+        run: |
+          [[ "$IMAGE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          registry="${ECR_REPOSITORY%%/*}"
+          repository="${ECR_REPOSITORY#*/}"
+          if ! aws ecr describe-images --repository-name "$repository" --image-ids "imageTag=$IMAGE_SHA" > /dev/null 2>&1; then
+            aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+            docker build -t "$ECR_REPOSITORY:$IMAGE_SHA" .
+            docker push "$ECR_REPOSITORY:$IMAGE_SHA"
+          fi
+          echo "tag=$IMAGE_SHA" >> "$GITHUB_OUTPUT"
+  deploy:
+    needs: publish
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || needs.publish.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: eta-aws-server
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      IMAGE_PARAMETER: ${{ vars.IMAGE_PARAMETER }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || needs.publish.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check repository configuration
+        run: |
+          test -n "$AWS_REGION" && test -n "$AWS_INSTANCE_ID" && test -n "$AWS_ROLE_ARN" && test -n "$ECR_REPOSITORY" && test -n "$IMAGE_PARAMETER" || {
+            echo 'Configure the five AWS repository variables from Terraform outputs.'
+            exit 1
+          }
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Replace only the API container, or select next boot image
+        run: python3 infra/scripts/aws_server.py deploy --image-tag "$IMAGE_TAG"
