@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y ca-certificates curl git unzip python3
+install -d -m 700 /etc/eta
+printf '%s' '${config}' | base64 -d > /etc/eta/config.json
+chmod 600 /etc/eta/config.json
+git clone 'https://github.com/${repository}.git' /opt/eta/repo
+git -C /opt/eta/repo checkout '${code_ref}'
+bash /opt/eta/repo/infra/scripts/bootstrap.sh

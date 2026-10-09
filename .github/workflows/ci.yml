@@ -82,3 +82,24 @@ jobs:
         run: docker compose logs
       - if: always()
         run: docker compose down -v
+
+  infrastructure:
+    name: Infrastructure (Terraform & scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "1.16.1"
+      - run: terraform -chdir=infra/aws fmt -check -recursive
+      - run: terraform -chdir=infra/aws init -backend=false -input=false
+      - run: terraform -chdir=infra/aws validate
+      - run: terraform -chdir=infra/aws test
+      - run: shellcheck infra/scripts/*.sh
+      - name: Validate server Compose with an empty environment file
+        env:
+          POSTGRES_PASSWORD: ci-placeholder
+        run: |
+          sudo mkdir -p /opt/eta/env
+          sudo install -m 644 /dev/null /opt/eta/env/api.env
+          docker compose -f infra/docker/compose.yml config --quiet

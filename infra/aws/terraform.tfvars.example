@@ -1,0 +1,15 @@
+aws_region    = "ap-northeast-2"
+project_name  = "eta-test"
+instance_type = "t3.medium"
+disk_size_gb  = 30
+
+# Replace with your domain, then point its A record at terraform output public_ip.
+api_domain = "api.your-domain.com"
+
+# Temporary IP-only testing alternative (do not use both examples at once):
+# api_domain         = ""
+# allow_plain_http   = true
+# allowed_web_cidrs  = ["YOUR_PUBLIC_IP/32"]
+
+# Reuse this if the AWS account already has GitHub's OIDC provider:
+# existing_github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"

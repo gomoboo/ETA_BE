@@ -295,3 +295,7 @@ ETA_BE/
 | [@dy401](https://github.com/dy401) | [@Raewon12](https://github.com/Raewon12) · [@leesk0007](https://github.com/leesk0007) | [@krot118](https://github.com/krot118) |
 
 </div>
+
+## AWS 테스트 서버 인프라
+
+Terraform으로 EC2 한 대를 구성하고 GitHub Actions에서 서버 시작·중지 및 API 이미지 배포를 관리합니다. 준비 사항과 실행 순서는 [infra/README.md](infra/README.md)를 확인하세요.
