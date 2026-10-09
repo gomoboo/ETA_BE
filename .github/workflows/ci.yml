@@ -96,7 +96,10 @@ jobs:
       - run: terraform -chdir=infra/aws validate
       - run: terraform -chdir=infra/aws test
       - run: shellcheck infra/scripts/*.sh
-      - name: Validate server Compose without loading secret files
+      - name: Validate server Compose with an empty environment file
         env:
           POSTGRES_PASSWORD: ci-placeholder
-        run: docker compose -f infra/docker/compose.yml config --quiet --no-env-resolution
+        run: |
+          sudo mkdir -p /opt/eta/env
+          sudo install -m 644 /dev/null /opt/eta/env/api.env
+          docker compose -f infra/docker/compose.yml config --quiet
