@@ -111,6 +111,7 @@ resource "aws_iam_role_policy" "server" {
   policy = jsonencode({
     Version = "2012-10-17", Statement = [
       { Effect = "Allow", Action = ["ssm:GetParameter"], Resource = [local.env_arn, local.image_arn] },
+      { Effect = "Allow", Action = ["ssm:PutParameter"], Resource = local.image_arn },
       { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
       { Effect = "Allow", Action = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"], Resource = aws_ecr_repository.api.arn }
     ]

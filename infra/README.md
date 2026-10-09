@@ -106,7 +106,7 @@ Power와 CD는 같은 concurrency group을 사용해 시작/중지/배포가 겹
 
 main push의 **CI 성공 → GitHub에서 Docker 빌드 → ECR에 커밋 SHA 태그 게시 → SSM으로 API 교체** 순서다. 태그는 immutable이고 CI가 검증한 정확한 SHA를 checkout한다. 실패 CI/PR CI에서는 게시하지 않는다. 최초 VM 설치에 한해 공개 저장소를 clone하고 VM에서 bootstrap 이미지를 빌드한다.
 
-서버가 running이면 `docker compose up -d --no-deps --no-build --wait api`로 API만 교체한다. DB/Redis와 볼륨은 유지한다. 새 API health가 실패하면 이전 로컬 이미지로 복구하고 workflow를 실패 처리하며 desired image 값은 바꾸지 않는다. **DB 마이그레이션은 되돌리지 않으므로 이전 이미지와 호환되는 스키마 변경만 적용해야 한다.**
+서버가 running이면 `docker compose up -d --no-deps --no-build --wait api`로 API만 교체한다. DB/Redis와 볼륨은 유지한다. 새 API health가 실패하면 이전 로컬 이미지와 다음 부팅 이미지 선택을 복구하고 workflow를 실패 처리한다. **DB 마이그레이션은 되돌리지 않으므로 이전 이미지와 호환되는 스키마 변경만 적용해야 한다.**
 
 서버가 stopped이면 이미지만 SSM의 비밀이 아닌 `desired-image` 값에 기록한다. 서버는 자동으로 켜지지 않는다. 다음 부팅에서 해당 이미지를 pull하고 DB/Redis/API/Caddy를 실행한다. pending/stopping에서는 CD가 실패하므로 power 작업 완료 뒤 재실행한다.
 

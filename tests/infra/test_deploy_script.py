@@ -28,7 +28,7 @@ def test_api_replacement_preserves_data_services_and_restores_failed_image(tmp_p
         target.write_text(source)
         target.chmod(0o755)
     (scripts / "config.py").write_text(
-        "import sys\nprint(" + repr({"ecr_registry": REGISTRY, "region": "ap-northeast-2"}) + "[sys.argv[1]])\n"
+        "import sys\nprint(" + repr({"ecr_registry": REGISTRY, "region": "ap-northeast-2", "image_parameter": "/eta-test/desired-image"}) + "[sys.argv[1]])\n"
     )
     binaries = tmp_path / "bin"
     binaries.mkdir()
@@ -74,3 +74,8 @@ elif name == 'curl' and scenario == 'curl-failure':
         assert result.returncode != 0
         assert OLD in image_file.read_text()
         assert len(replacements) == (0 if scenario == "pull-failure" else 2), result.stderr
+        selections = [args for name, args in calls if name == "aws" and "put-parameter" in args]
+        if scenario != "pull-failure":
+            assert selections[0][-1] == OLD  # Next boot also restores the last healthy version.
+        else:
+            assert selections == []

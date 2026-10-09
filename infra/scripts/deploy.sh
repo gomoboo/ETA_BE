@@ -29,6 +29,11 @@ if ! "$SCRIPTS/compose.sh" up -d --no-deps --no-build --wait --wait-timeout 180 
     sed "s|^API_IMAGE=.*|API_IMAGE=$previous|" /opt/eta/env/image.env > /opt/eta/env/.rollback-image.env
     mv /opt/eta/env/.rollback-image.env /opt/eta/env/image.env
     "$SCRIPTS/compose.sh" up -d --no-deps --no-build --wait --wait-timeout 180 api
+    # A failed image selected while stopped must not be retried on every boot/service restart.
+    parameter=$(python3 "$SCRIPTS/config.py" image_parameter)
+    desired="$previous"
+    if [ "$previous" = eta-backend:bootstrap ]; then desired=bootstrap; fi
+    aws ssm put-parameter --region "$region" --name "$parameter" --type String --overwrite --value "$desired" > /dev/null
   fi
   exit 1
 fi
