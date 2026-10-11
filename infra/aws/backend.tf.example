@@ -1,0 +1,11 @@
+# Optional: copy to backend.tf after creating a private versioned state bucket.
+# The initial local state is sufficient for one operator; Actions start/stop/CD do not run Terraform.
+terraform {
+  backend "s3" {
+    bucket       = "YOUR_PRIVATE_TERRAFORM_STATE_BUCKET"
+    key          = "eta-test/terraform.tfstate"
+    region       = "ap-northeast-2"
+    encrypt      = true
+    use_lockfile = true
+  }
+}
