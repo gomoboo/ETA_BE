@@ -151,10 +151,9 @@ resource "aws_instance" "server" {
     ignore_changes  = [ami, user_data]
     precondition {
       condition = var.api_domain != "" || (
-        var.allow_plain_http && length(var.allowed_web_cidrs) > 0 &&
-        alltrue([for cidr in var.allowed_web_cidrs : tonumber(split("/", cidr)[1]) >= 24])
+        var.allow_plain_http && length(var.allowed_web_cidrs) > 0
       )
-      error_message = "Set api_domain for HTTPS, or explicitly enable temporary HTTP with /24 or narrower tester CIDRs."
+      error_message = "Set api_domain for HTTPS, or explicitly enable temporary HTTP with at least one allowed IPv4 CIDR."
     }
   }
   depends_on = [aws_route_table_association.server, aws_iam_role_policy.server, aws_iam_role_policy_attachment.ssm]
