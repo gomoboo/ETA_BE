@@ -45,7 +45,10 @@ run "persistent_server" {
 }
 run "plain_http_requires_opt_in" {
   command = plan
-  variables { api_domain = "" }
+  variables {
+    api_domain       = ""
+    allow_plain_http = false
+  }
   expect_failures = [aws_instance.server]
 }
 run "public_http_with_explicit_opt_in" {
