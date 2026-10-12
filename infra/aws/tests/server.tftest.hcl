@@ -45,17 +45,23 @@ run "persistent_server" {
 }
 run "plain_http_requires_opt_in" {
   command = plan
-  variables { api_domain = "" }
+  variables {
+    api_domain       = ""
+    allow_plain_http = false
+  }
   expect_failures = [aws_instance.server]
 }
-run "plain_http_cannot_be_public" {
+run "public_http_with_explicit_opt_in" {
   command = plan
   variables {
     api_domain        = ""
     allow_plain_http  = true
     allowed_web_cidrs = ["0.0.0.0/0"]
   }
-  expect_failures = [aws_instance.server]
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.https) == 0 && length(aws_vpc_security_group_ingress_rule.http) == 1 && aws_vpc_security_group_ingress_rule.http["0.0.0.0/0"].from_port == 80 && aws_vpc_security_group_ingress_rule.http["0.0.0.0/0"].to_port == 80
+    error_message = "Explicit public HTTP access must open only port 80 without HTTPS ingress."
+  }
 }
 run "restricted_temporary_http" {
   command = plan

@@ -53,7 +53,7 @@ variable "api_domain" {
   }
 }
 variable "allowed_web_cidrs" {
-  description = "80/443 ingress. Without a domain, restrict this to the testers' public IPs."
+  description = "IPv4 CIDRs allowed on web ports; use 0.0.0.0/0 for access from all IPv4 addresses."
   type        = set(string)
   default     = ["0.0.0.0/0"]
   validation {
@@ -62,7 +62,7 @@ variable "allowed_web_cidrs" {
   }
 }
 variable "allow_plain_http" {
-  description = "Explicit opt-in for temporary IP-only testing; requires restricted IPv4 ingress."
+  description = "Explicit opt-in for temporary HTTP testing without a domain."
   type        = bool
   default     = false
 }

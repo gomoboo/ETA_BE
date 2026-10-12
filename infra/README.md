@@ -14,7 +14,7 @@
 
 1. **AWS 계정과 결제 수단**, 리소스를 생성할 권한이 있는 AWS CLI 프로필. 계정 ID와 프로필 이름만 공유하면 된다. Access Key/비밀번호는 채팅이나 Git에 넣지 않는다.
 2. 로컬 **Terraform 1.10 이상**과 **AWS CLI v2**. 예제의 `eta`는 본인의 프로필 이름으로 바꾼다. IAM Identity Center를 쓰면 `aws configure sso --profile eta`, `aws sso login --profile eta`로 로그인한다. 다른 인증 방식이라면 로컬 CLI에서만 설정한다.
-3. **API 도메인** 및 DNS A 레코드 변경 권한. 도메인이 없으면 아래의 제한된 IP-only 임시 테스트 설정을 사용한다.
+3. **API 도메인** 및 DNS A 레코드 변경 권한. 도메인이 없으면 아래의 IP-only 임시 테스트 설정을 사용한다.
 4. GitHub 저장소 Actions 변수를 설정할 권한. AWS 연결에는 OIDC 임시 자격 증명을 사용하며 장기 AWS 키를 GitHub Secrets에 저장하지 않는다.
 5. 실제 카카오 REST API 키와 DB 비밀번호를 SSM SecureString에 입력할 준비. 초기 DB 비밀번호는 32-128자리 무작위 16진수로 만든다. API 키가 없으면 장소 검색은 실제 검증 대상에서 제외한다.
 
@@ -57,7 +57,7 @@ terraform -chdir=infra/aws output
 
 출력한 `public_ip`에 도메인의 A 레코드를 연결한다. 외부에서는 80/443만 열고 API/DB/Redis는 공개하지 않는다. 80은 HTTPS 전환 및 인증서 발급에 사용한다. 관리 접속은 AWS Systems Manager Session Manager를 사용하며 SSH 키나 22번 포트는 필요 없다.
 
-도메인이 없다면 처음부터 다음처럼 설정한다. 실제 테스트 기기의 공인 IP를 입력해야 하며 `0.0.0.0/0` HTTP는 검증에서 거부한다.
+도메인이 없다면 처음부터 다음처럼 설정한다. `allowed_web_cidrs`에 테스트 기기의 공인 IP를 입력한다. 모든 IPv4 주소에서 접속을 허용하려면 `["0.0.0.0/0"]`를 사용한다. 도메인이 없으면 외부 인바운드는 HTTP 80번만 생성한다.
 
 ```hcl
 api_domain        = ""

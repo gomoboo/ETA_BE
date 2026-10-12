@@ -10,6 +10,8 @@ api_domain = "api.your-domain.com"
 # api_domain         = ""
 # allow_plain_http   = true
 # allowed_web_cidrs  = ["YOUR_PUBLIC_IP/32"]
+# To allow all IPv4 addresses on HTTP port 80 instead:
+# allowed_web_cidrs  = ["0.0.0.0/0"]
 
 # Reuse this if the AWS account already has GitHub's OIDC provider:
 # existing_github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
