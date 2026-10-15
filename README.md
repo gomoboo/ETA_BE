@@ -28,8 +28,8 @@
 | 📡 | **실시간 레이더** | 약속 N분 전부터 참가자 위치·거리·예상 도착 시간 실시간 공유 (WebSocket) |
 | 👉 | **미출발 찌르기** | 같은 자리에 5분 이상 머문 "미출발 의심" 친구를 찔러서 출발 독촉 |
 | 📍 | **자동 체크인** | 목적지 반경 **30m** 진입 시 자동 도착 처리 (일찍 / 정시 / 지각 판정) |
-| 💸 | **지각비 정산** | 벌칙 모드 또는 분당 지각비 모드로 참가자별 지각비 자동 계산 |
-| 🚨 | **지각 체포 영장** | 지각자 전원에게 죄명·판결문("찌르기 N회 무시 검거")이 담긴 영장 발부 |
+| 💸 | **지각 정산** | 벌칙 모드 또는 분당 지각비 모드로 참가자별 지각 시간·지각비 자동 계산 |
+| 🚨 | **지각 체포 영장** | 지각자 전원에게 죄명·판결문("약속 시간 N분 초과 및 찌르기 M회 무시 검거")이 담긴 영장 발부 |
 
 ---
 
@@ -77,7 +77,8 @@ flowchart LR
 | **Database** | PostgreSQL 16 (운영) / SQLite (로컬·테스트), SQLAlchemy 2.0 Async, Alembic |
 | **Real-time** | WebSocket, Redis (참가자 위치 캐시) |
 | **External** | Kakao Local API (장소 검색) |
-| **DevOps** | Docker Compose, GitHub Actions (ruff · pytest · PostgreSQL 마이그레이션 · Docker 빌드) |
+| **DevOps** | Docker Compose, GitHub Actions (CI · AWS 배포 · 서버 시작/중지) |
+| **Infra** | AWS EC2 (서울) · ECR · SSM, Terraform, Caddy |
 
 ---
 
@@ -198,12 +199,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                # 100개 테스트, 약 2초
+pytest                # 137개 테스트, 약 6초
 ruff check .          # 린트
 ```
 
 - 테스트마다 **임시 SQLite DB + fakeredis**를 사용해서 외부 서비스 없이 실행됩니다.
-- PR과 `main`/`dev` push 시 GitHub Actions가 자동으로 검사합니다.
+- PR과 `main` push 시 GitHub Actions가 자동으로 검사합니다.
 
 | CI Job | 내용 |
 |---|---|
@@ -211,6 +212,7 @@ ruff check .          # 린트
 | 🧪 Test | `pytest` (REST API, WebSocket, 마이그레이션, 위치 서비스) |
 | 🐘 Migrations | PostgreSQL 16에서 `upgrade → downgrade → upgrade → check` |
 | 🐳 Docker | 이미지 빌드 → 전체 스택 기동 → `/health` 확인 |
+| 🏗 Infrastructure | Terraform `fmt` · `validate` · mock 테스트, ShellCheck, 서버 Compose 설정 검사 |
 
 <details>
 <summary><b>🗄 DB 마이그레이션 (Alembic)</b></summary>
@@ -253,15 +255,33 @@ ETA_BE/
 │       ├── geo_service.py                # 거리 계산, 이동 상태, Redis 위치 캐시
 │       └── kakao_place_service.py        # 카카오 장소 검색
 ├── alembic/                     # DB 마이그레이션
-├── tests/                       # pytest (api/, 마이그레이션, 위치 서비스)
+├── infra/                       # AWS 테스트 서버 (Terraform, 서버 Compose, 배포 스크립트)
+├── tests/                       # pytest (api/, infra/, 마이그레이션, 위치 서비스)
 ├── docs/
 │   ├── FRONTEND_INTEGRATION.md  # 프론트 연동 가이드
 │   ├── DB_SCHEMA.md             # DB 스키마 & 데이터 사전
 │   └── CONVENTION.md            # 협업 컨벤션
-├── .github/workflows/ci.yml     # GitHub Actions CI
+├── .github/workflows/           # ci.yml (CI) · aws-cd.yml (배포) · aws-power.yml (서버 시작/중지)
 ├── Dockerfile · docker-compose.yml · docker-entrypoint.sh
 └── requirements.txt · requirements-dev.txt · ruff.toml · pytest.ini
 ```
+
+---
+
+## ☁️ AWS 테스트 서버
+
+서울 리전 EC2 한 대에서 API · PostgreSQL · Redis · Caddy를 Docker Compose로 실행합니다. 인프라는 Terraform으로 만들고, 서버 운영은 GitHub Actions에서 합니다.
+
+| 하고 싶은 것 | 방법 |
+|---|---|
+| 서버 켜기 / 끄기 / 상태 확인 | **Actions → AWS server power → Run workflow** 에서 `start` / `stop` / `status` |
+| 새 코드 배포 | `main`에 머지되고 CI가 통과하면 자동 배포 (API 컨테이너만 교체, 실패 시 이전 이미지로 복구) |
+| 특정 버전으로 되돌리기 | **Actions → AWS simple CD → Run workflow** 에 커밋 SHA 입력 |
+
+- 서버를 꺼도 DB 데이터와 고정 IP는 유지됩니다. 꺼진 동안 머지된 코드는 다음에 켤 때 반영됩니다.
+- 지금은 도메인 없이 **HTTP(80)** 로 열려 있는 테스트용 서버입니다.
+- 배포 중에는 WebSocket이 끊기므로 앱이 다시 연결해야 합니다.
+- 처음 구성하는 방법과 주의 사항은 👉 **[infra/README.md](infra/README.md)**
 
 ---
 
@@ -271,13 +291,16 @@ ETA_BE/
 |---|---|
 | 📱 [프론트엔드 연동 가이드](docs/FRONTEND_INTEGRATION.md) | 인증, 에러 코드, API별 규칙, WebSocket 흐름, Flutter 예시 코드 |
 | 🗄 [DB 스키마](docs/DB_SCHEMA.md) | ERD, 테이블 정의, Enum |
+| ☁️ [AWS 인프라](infra/README.md) | 서버 구성, 시작/중지, 배포, 비용 |
 | 🤝 [협업 컨벤션](docs/CONVENTION.md) | 브랜치, 이슈, 커밋, PR 규칙 |
 
 ---
 
 ## 🚧 남은 작업
 
-- [ ] 자동 배포 (CD) — 배포 서버 결정 후 ([#14](https://github.com/gomoboo/ETA_BE/issues/14))
+- [x] 자동 배포 (CD) — AWS EC2 ([#48](https://github.com/gomoboo/ETA_BE/issues/48))
+- [ ] HTTPS 도메인 연결 (지금은 IP + HTTP로 테스트 중)
+- [ ] DB 자동 백업
 - [ ] AI PR 리뷰 봇 ([#15](https://github.com/gomoboo/ETA_BE/issues/15))
 - [ ] FCM 푸시 (앱이 꺼져 있을 때 찌르기 알림)
 - [ ] 외부 공유용 공개 조회 API, 영장 카드 이미지 생성
@@ -295,7 +318,3 @@ ETA_BE/
 | [@dy401](https://github.com/dy401) | [@Raewon12](https://github.com/Raewon12) · [@leesk0007](https://github.com/leesk0007) | [@krot118](https://github.com/krot118) |
 
 </div>
-
-## AWS 테스트 서버 인프라
-
-Terraform으로 EC2 한 대를 구성하고 GitHub Actions에서 서버 시작·중지 및 API 이미지 배포를 관리합니다. 준비 사항과 실행 순서는 [infra/README.md](infra/README.md)를 확인하세요.
