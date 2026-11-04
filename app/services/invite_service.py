@@ -9,6 +9,7 @@ from app.core.time import utcnow
 from app.core.websocket_manager import manager
 from app.models import Appointment, AppointmentStatus, JoinStatus, Participant, PenaltyType, User
 from app.services.appointment_service import calculate_radar_minutes
+from app.services.appointment_lifecycle_service import complete_expired_appointments
 from app.services.location_cleanup_service import clear_location_cache
 from app.services.user_service import validate_nickname
 
@@ -103,6 +104,7 @@ async def _close_location_socket(appointment_id: int, participant_id: int) -> No
 
 async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -> Participant:
     """[API-08] 약속 나가기. 방장이 나가면 가장 먼저 참여한 참가자에게 방장 위임"""
+    await complete_expired_appointments(db, appointment_id=appointment_id)
     appointment = await db.get(Appointment, appointment_id)
     if appointment is None:
         raise AppException(ErrorCode.APPOINTMENT_NOT_FOUND)
@@ -134,9 +136,16 @@ async def leave_appointment(db: AsyncSession, user: User, appointment_id: int) -
             # 남은 참가자가 없으면 약속 취소
             appointment.status = AppointmentStatus.CANCELLED.value
 
+    await db.flush()
+    remaining = list((await db.scalars(select(Participant).where(
+        Participant.appointment_id == appointment_id,
+        Participant.join_status == JoinStatus.JOINED.value,
+    ))).all())
+    if remaining and all(p.is_arrived for p in remaining) and appointment.status not in ENDED_STATUSES:
+        appointment.status = AppointmentStatus.COMPLETED.value
     await db.commit()
     await _close_location_socket(appointment_id, participant.id)
-    if appointment.status == AppointmentStatus.CANCELLED.value:
+    if appointment.status in ENDED_STATUSES:
         await clear_location_cache(appointment_id)
     else:
         await clear_location_cache(appointment_id, participant.id)

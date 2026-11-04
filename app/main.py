@@ -1,11 +1,14 @@
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.redis import init_redis_pool, close_redis_pool
+from app.core.database import get_session_factory
+from app.services.appointment_lifecycle_service import run_expiry_worker
 from app.api.v1.router import api_router
 
 logger = logging.getLogger(__name__)
@@ -19,9 +22,15 @@ async def lifespan(app: FastAPI):
         await redis.ping()
     except Exception as e:
         logger.warning("Redis connection failed on startup: %s", e)
-    yield
-    # Shutdown
-    await close_redis_pool()
+    factory_provider = app.dependency_overrides.get(get_session_factory, get_session_factory)
+    expiry_task = asyncio.create_task(run_expiry_worker(factory_provider()))
+    try:
+        yield
+    finally:
+        expiry_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await expiry_task
+        await close_redis_pool()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # 결과 공유 링크 (정산/영장 공유 URL, 카드 이미지 URL의 기본 주소)
     SHARE_BASE_URL: str = "https://eta.app"
 
-    # 정산: 약속 시간 이후 이 시간(분)이 지나면 미도착자가 있어도 정산 확정 (미도착자 지각 시간 = 이 값)
+    # 약속 종료: 이 시간(분) 경과 시 자동 종료하고 정산 가능 (미도착자 지각 시간 = 이 값)
     SETTLEMENT_TIMEOUT_MINUTES: int = 60
 
     # 실시간 레이더: 목적지 반경 이 거리(m) 안에 들어오면 자동 체크인 (WS-06 명세 30m)

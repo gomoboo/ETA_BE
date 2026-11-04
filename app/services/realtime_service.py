@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.schemas.websocket import LocationUpdatePayload, PokeRespondPayload, PokeSendPayload
 from app.services.geo_service import GeoService, is_within_geofence
+from app.services.appointment_lifecycle_service import complete_expired_appointments, has_reached_deadline
 from app.services.location_cleanup_service import clear_location_cache
 from app.services.settlement_service import calculate_fine_amount, calculate_late_minutes
 
@@ -66,7 +67,8 @@ async def authorize_connection(
 
 
 async def _load_context(db: AsyncSession, appointment_id: int, participant_id: int) -> tuple[Appointment, Participant]:
-    appointment = await db.get(Appointment, appointment_id)
+    await complete_expired_appointments(db, appointment_id=appointment_id)
+    appointment = await db.scalar(select(Appointment).where(Appointment.id == appointment_id).with_for_update())
     if appointment is None:
         raise AppException(ErrorCode.APPOINTMENT_NOT_FOUND)
     if appointment.status in ENDED_STATUSES:
@@ -159,6 +161,9 @@ async def handle_location_update(
         raise AppException(ErrorCode.LOCATION_SHARING_ENDED)
 
     now = utcnow()
+    if has_reached_deadline(appointment, now):
+        await complete_expired_appointments(db, appointment_id=appointment.id, now=now)
+        raise AppException(ErrorCode.APPOINTMENT_ALREADY_ENDED)
     if appointment.status != AppointmentStatus.RADAR_ACTIVE.value:
         if now < appointment.radar_start_at:
             raise AppException(ErrorCode.RADAR_NOT_STARTED)
@@ -177,6 +182,10 @@ async def handle_location_update(
     )
 
     try:
+        now = utcnow()
+        if has_reached_deadline(appointment, now):
+            await complete_expired_appointments(db, appointment_id=appointment.id, now=now)
+            raise AppException(ErrorCode.APPOINTMENT_ALREADY_ENDED)
         if is_within_geofence(
             payload.latitude, payload.longitude,
             appointment.target_latitude, appointment.target_longitude,
@@ -187,7 +196,7 @@ async def handle_location_update(
         await manager.broadcast_to_appointment(appointment.id, await build_map_sync(db, appointment))
     finally:
         # 마지막 checkin:completed와 map:sync를 보낸 뒤 전체 위치를 삭제한다.
-        if appointment.status == AppointmentStatus.COMPLETED.value:
+        if appointment.status == AppointmentStatus.COMPLETED.value or has_reached_deadline(appointment, utcnow()):
             await clear_location_cache(appointment.id)
 
 

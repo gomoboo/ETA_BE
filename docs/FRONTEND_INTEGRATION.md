@@ -133,7 +133,9 @@
 - `activeAppointments`: 레이더 시작 시각(`radarStartAt`)이 지난 약속, `isLocationSharingActive: true`
 - `upcomingAppointments`: 아직 레이더 시작 전
 - `participantCount`: 나간 사람을 제외한 인원
-- 정산 API를 조회했거나 전원 도착한 약속은 `COMPLETED`가 되어 목록에서 빠집니다.
+- **참여 중인 참가자 전원 도착 또는 `meetAt + 60분` 경과 시 `COMPLETED`**가 되어 홈 목록에서 빠집니다. 정산 API 호출은 종료의 필수 조건이 아닙니다.
+- 홈·상세·소켓 요청에서 만료를 검사하며, 요청이 없어도 백그라운드 작업이 5초 간격으로 만료 상태와 위치 캐시를 정리합니다. 서버 재시작 시에도 이미 만료된 약속을 처리합니다.
+- 종료된 약속은 `activeAppointments`와 `upcomingAppointments` 모두에서 제외됩니다. 프론트가 날짜로 임의 분류하거나 정산 API를 호출해 목록을 정리할 필요가 없습니다.
 
 ### [API-03] 장소 검색 — `GET /places/search?query=강남역` (헤더 불필요)
 - 최대 15개를 반환합니다. `address`는 도로명 주소를 우선 쓰고, 없으면 지번 주소를 씁니다.
@@ -211,7 +213,9 @@ ws://{host}/api/v1/ws/appointments/{appointmentId}?participant_id={myParticipant
 - `guestUuid` 대신 `X-Guest-UUID` 헤더를 써도 됩니다.
 - 아래 경우 서버가 **close code `1008`**로 연결을 거부합니다. 참여하지 않았거나 나간 약속, 다른 사람의 `participant_id`, 종료·취소된 약속, `guestUuid` 누락.
 - 같은 참가자가 다시 접속하면 **이전 연결은 서버가 닫습니다.** 앱이 백그라운드에서 돌아올 때 재접속하면 됩니다.
-- 접속은 언제든 가능하지만, **위치 전송은 `radarStartAt` 이후부터** 받습니다.
+- 종료 전에는 접속할 수 있지만, **위치 전송은 `radarStartAt` 이후부터** 받습니다.
+- **전원 도착 또는 `meetAt + 60분` 경과 후에는 위치 공유가 종료**됩니다. 기존 연결의 추가 메시지는 `error / APPOINTMENT_ALREADY_ENDED`로 거부되므로 위치 전송을 중단하고 홈을 갱신하세요. 만료된 약속으로 새 연결을 시도하면 거부됩니다.
+- 연결 성립 전에 거부되면 클라이언트에 따라 WebSocket close code 대신 HTTP 403 handshake 실패로 표시될 수 있습니다.
 
 ### 6.2 메시지 형식 ⚠️
 명세의 payload에 **`type`** 필드를 더한 JSON 한 개입니다.

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException, ErrorCode
 from app.core.time import utcnow
 from app.models import Appointment, AppointmentStatus, JoinStatus, Participant, User
+from app.services.appointment_lifecycle_service import complete_expired_appointments, has_reached_deadline
 
 ENDED_STATUSES = {AppointmentStatus.COMPLETED.value, AppointmentStatus.CANCELLED.value}
 
@@ -14,7 +15,7 @@ ENDED_STATUSES = {AppointmentStatus.COMPLETED.value, AppointmentStatus.CANCELLED
 
 def is_location_sharing_active(appointment: Appointment, now: datetime) -> bool:
     """레이더 시작 시각이 지났거나 RADAR_ACTIVE 상태면 위치 공유 중"""
-    if appointment.status in ENDED_STATUSES:
+    if appointment.status in ENDED_STATUSES or has_reached_deadline(appointment, now):
         return False
     return appointment.status == AppointmentStatus.RADAR_ACTIVE.value or now >= appointment.radar_start_at
 
@@ -32,6 +33,8 @@ class HomeAppointment:
 
 async def get_home_appointments(db: AsyncSession, user: User) -> tuple[list[HomeAppointment], list[HomeAppointment]]:
     """[API-02] 내가 참여 중인(JOINED) 종료되지 않은 약속을 진행 중/예정으로 나눠 조회"""
+    now = utcnow()
+    await complete_expired_appointments(db, user_id=user.id, now=now)
     my_appointment_ids = select(Participant.appointment_id).where(
         Participant.user_id == user.id,
         Participant.join_status == JoinStatus.JOINED.value,
@@ -49,7 +52,6 @@ async def get_home_appointments(db: AsyncSession, user: User) -> tuple[list[Home
         .order_by(Appointment.meet_at, Appointment.id)
     )
 
-    now = utcnow()
     active, upcoming = [], []
     for appointment, count in result.all():
         sharing = is_location_sharing_active(appointment, now)
@@ -78,4 +80,6 @@ async def get_appointment_detail(
     participants = list(result.scalars().all())
     if not any(p.user_id == user.id for p in participants):
         raise AppException(ErrorCode.NOT_PARTICIPANT)
+    await complete_expired_appointments(db, appointment_id=appointment_id)
+    await db.refresh(appointment)
     return appointment, participants

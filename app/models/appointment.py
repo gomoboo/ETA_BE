@@ -7,7 +7,7 @@ from app.core.database import Base
 class AppointmentStatus(str, enum.Enum):
     SCHEDULED = "SCHEDULED"          # 약속 생성 후 레이더 시작 전 대기 상태
     RADAR_ACTIVE = "RADAR_ACTIVE"    # 레이더 시작 ~ 약속 진행 중 (위치 공유 활성)
-    COMPLETED = "COMPLETED"          # 전원 도착 또는 정산 완료
+    COMPLETED = "COMPLETED"          # 전원 도착 또는 약속 시간 60분 경과 (정산 결과는 이후 조회 가능)
     CANCELLED = "CANCELLED"          # 약속 취소
 
 class RadarStartType(str, enum.Enum):
