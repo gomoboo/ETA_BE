@@ -41,7 +41,7 @@ erDiagram
         string radar_start_type "레이더 시작 설정"
         int custom_radar_minutes_before "CUSTOM 시작 분 (옵션)"
         timestamp radar_start_at "실제 레이더 활성화 시각"
-        string penalty_type "벌칙 모드 (PENALTY / FEE)"
+        string penalty_type "벌칙 모드 (NONE / PENALTY / FEE)"
         string penalty_content "벌칙 내용 문구"
         int fine_per_minute "분당 지각비 금액"
         string invite_code UK "6자리 고유 초대 코드"
@@ -132,7 +132,7 @@ erDiagram
 | `radar_start_type` | `VARCHAR(20)` | NOT NULL | `'30M_BEFORE'`| `10M_BEFORE`, `20M_BEFORE`, `30M_BEFORE`, `1H_BEFORE`, `CUSTOM` |
 | `custom_radar_minutes_before`| `INT` | NULL | `30` | `CUSTOM` 레이더 설정 시 N분 전 값 |
 | `radar_start_at` | `TIMESTAMP` | NOT NULL | - | **계산된 실제 위치 공유 시작 일시** (`meet_at - radar_minutes`) |
-| `penalty_type` | `VARCHAR(20)` | NOT NULL | `'PENALTY'` | **벌칙 유형 (`PENALTY`: 고정벌칙, `FEE`: 분당지각비)** |
+| `penalty_type` | `VARCHAR(20)` | NOT NULL | `'PENALTY'` | **벌칙 유형 (`NONE`: 규칙없음, `PENALTY`: 고정벌칙, `FEE`: 분당지각비)** |
 | `penalty_content` | `VARCHAR(100)` | NULL | - | 벌칙 내용 문구 (예: 오늘 커피 쏘기) |
 | `fine_per_minute` | `INT` | NOT NULL | `0` | 1분당 지각비 금액 (원 단위, 예: 1000) |
 | `invite_code` | `VARCHAR(16)` | NOT NULL, UNIQUE | - | 6자리 고유 초대 난수 코드 (예: `ETA88A`) |
@@ -211,7 +211,8 @@ erDiagram
 
 | 열거형 (Enum) | 허용 값 (Values) | 설명 |
 | :--- | :--- | :--- |
-| **`PenaltyType`** | `PENALTY` | 고정 벌칙 텍스트 수행 (예: 커피 쏘기) |
+| **`PenaltyType`** | `NONE` | 지각 규칙 없음 (벌칙 문구·지각비 없이 도착/지각 기록만 관리) |
+| | `PENALTY` | 고정 벌칙 텍스트 수행 (예: 커피 쏘기) |
 | | `FEE` | 분당 지각비 누적 납부 (예: 분당 1,000원) |
 | **`AppointmentStatus`** | `SCHEDULED` | 약속 생성 완료, 레이더 시작 전 대기 |
 | | `RADAR_ACTIVE` | 레이더 시작 시각 도달 (실시간 위치 공유 활성) |

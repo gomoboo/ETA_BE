@@ -65,6 +65,14 @@ def test_detail_remaining_seconds_is_zero_after_radar_start(client, users, creat
     assert data["remainingSecondsToRadar"] == 0
 
 
+def test_detail_returns_none_penalty(client, users, create_appointment):
+    appointment = create_appointment(
+        "host", penaltyType="NONE", penaltyContent=None, finePerMinute=0, meetAt=future_iso(days=2)
+    )
+    data = client.get(f"/api/v1/appointments/{appointment['appointmentId']}", headers=auth("host")).json()["data"]
+    assert data["penalty"] == {"type": "NONE", "content": None, "finePerMinute": 0}
+
+
 @pytest.mark.parametrize("guest_uuid, path_id, expected", [
     ("out", None, (403, "NOT_PARTICIPANT")),
     ("host", 9999, (404, "APPOINTMENT_NOT_FOUND")),

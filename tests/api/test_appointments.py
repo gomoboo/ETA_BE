@@ -50,6 +50,38 @@ def test_penalty_mode_forces_zero_fine(host, create_appointment, db):
     assert db.scalar("select fine_per_minute from appointments where id=?", data["appointmentId"]) == 0
 
 
+def test_none_mode_clears_content_and_forces_zero_fine(client, host, create_appointment, db):
+    # 필수 벌칙 문구/분당 지각비 없이 NONE 생성 가능, 잔여 값이 들어와도 초기화됨
+    minimal = client.post(
+        "/api/v1/appointments",
+        json={
+            "title": "규칙 없는 약속",
+            "targetPlaceName": "스타벅스 강남역점",
+            "targetLatitude": 37.497952,
+            "targetLongitude": 127.027619,
+            "meetAt": future_iso(),
+            "penaltyType": "NONE",
+        },
+        headers=auth(host),
+    )
+    assert minimal.status_code == 200
+    assert db.fetchone(
+        "select penalty_type, penalty_content, fine_per_minute from appointments where id=?",
+        minimal.json()["data"]["appointmentId"],
+    ) == ("NONE", None, 0)
+
+    cleared = create_appointment(host, penaltyType="NONE", penaltyContent="무시될 값", finePerMinute=5000)
+    assert db.fetchone(
+        "select penalty_type, penalty_content, fine_per_minute from appointments where id=?",
+        cleared["appointmentId"],
+    ) == ("NONE", None, 0)
+
+
+def test_openapi_exposes_none_penalty_type(client):
+    schema = client.get("/api/v1/openapi.json").json()
+    assert schema["components"]["schemas"]["PenaltyType"]["enum"] == ["NONE", "PENALTY", "FEE"]
+
+
 def test_invite_codes_are_unique(host, create_appointment):
     codes = {create_appointment(host)["inviteCode"] for _ in range(20)}
     assert len(codes) == 20

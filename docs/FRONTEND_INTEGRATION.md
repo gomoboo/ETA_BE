@@ -157,7 +157,8 @@
 | `meetAt` | **현재 이후**만 가능. 시간대를 포함해서 보내면 UTC로 변환합니다(`+09:00` 가능) |
 | `radarStartType` | `10M_BEFORE`, `20M_BEFORE`, `30M_BEFORE`(기본), `1H_BEFORE`, `CUSTOM` |
 | `customRadarMinutesBefore` | `CUSTOM`일 때만 **필수**(1~1440분), 그 외에는 무시 |
-| `penaltyType` | `PENALTY`(벌칙): `penaltyContent` **필수**, `finePerMinute`는 0으로 저장 |
+| `penaltyType` | **`NONE`**(규칙 없음): `penaltyContent`는 비우고 `finePerMinute`는 0으로 저장 |
+| | `PENALTY`(벌칙): `penaltyContent` **필수**, `finePerMinute`는 0으로 저장 |
 | | **`FEE`**(지각비): `finePerMinute` **1 이상 필수**, `penaltyContent`는 비움 |
 
 - 응답의 `inviteUrl`(`https://eta.app/invite/{inviteCode}`)을 공유하면 됩니다. 초대 코드는 6자리 대문자+숫자입니다.
@@ -165,7 +166,7 @@
 
 ### [API-05] 초대 링크 미리보기 — `GET /appointments/invite/{inviteCode}` (헤더 불필요)
 - 온보딩 전 사용자도 볼 수 있습니다. 초대 코드는 대소문자를 구분하지 않습니다.
-- `penaltySummary`: `"벌칙: 커피 쏘기"` / `"지각비: 분당 1,000원"`
+- `penaltySummary`: `"지각 규칙 없음"` / `"벌칙: 커피 쏘기"` / `"지각비: 분당 1,000원"`
 - `radarStartSummary`: `"약속 30분 전부터 위치 공유 시작"` / `"약속 1시간 30분 전부터 ..."`
 - ⚠️ **약속이 종료·취소됐거나 약속 시간이 지났으면** `410 INVITE_LINK_EXPIRED`
 
@@ -190,7 +191,7 @@
 ### [API-09] 정산 결과 — `GET /appointments/{appointmentId}/settlement`
 - ⚠️ 정산은 **① 전원 도착(체크인) ② 약속 시간 + 60분 경과 ③ 이미 완료된 약속** 중 하나일 때만 가능합니다. 그 전에는 `409 SETTLEMENT_NOT_READY`
 - ⚠️ 지각 시간은 **분 단위 버림**입니다(18분 30초 → 18분). **끝까지 도착하지 않은 사람은 60분 지각**으로 처리합니다.
-- 지각비: `FEE` 모드는 `지각 분 × finePerMinute`, `PENALTY` 모드는 항상 0
+- 지각비: `FEE` 모드는 `지각 분 × finePerMinute`, `NONE`·`PENALTY` 모드는 항상 0
 - 처음 조회할 때 결과가 확정되고, 이후에는 같은 결과를 돌려줍니다.
 - `arrivalStatus`: `EARLY` / `ON_TIME` / `LATE` / `NOT_ARRIVED`(미도착)
 
@@ -257,7 +258,7 @@ ws://{host}/api/v1/ws/appointments/{appointmentId}?participant_id={myParticipant
   | `LATE` | 약속 시간이 지났는데 이동 중 — **명세에 없음** |
   | `ARRIVED` | 체크인 완료 — **명세에 없음** |
 - `lateElapsedSeconds`: 약속 시간 이후 지난 초입니다. 도착한 사람은 도착 시각 기준으로 고정돼요.
-- `currentAccruedFine`: `FEE` 모드에서 지금까지 쌓인 지각비(`지난 분 × 분당 금액`)입니다. `PENALTY` 모드는 0이에요.
+- `currentAccruedFine`: `FEE` 모드에서 지금까지 쌓인 지각비(`지난 분 × 분당 금액`)입니다. `NONE`·`PENALTY` 모드는 0이에요.
 - `estimatedArrivalMinutes`: 속도가 2km/h 이하면 `null`
 
 **`poke:received`** — 명세와 같습니다. `remainingDistanceMeter`는 대상의 위치가 아직 없으면 `null`입니다.

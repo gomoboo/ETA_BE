@@ -60,10 +60,14 @@ class AppointmentCreateRequest(BaseModel):
             if self.penalty_content is None:
                 raise ValueError("벌칙 모드는 penaltyContent가 필요합니다.")
             self.fine_per_minute = 0
-        else:
+        elif self.penalty_type == PenaltyType.FEE:
             if self.fine_per_minute <= 0:
                 raise ValueError("지각비 모드는 finePerMinute가 0보다 커야 합니다.")
             self.penalty_content = None
+        else:
+            # 지각 규칙 없음(NONE)은 벌칙 문구와 분당 지각비를 모두 비운다.
+            self.penalty_content = None
+            self.fine_per_minute = 0
         return self
 
 
@@ -83,7 +87,7 @@ class InvitePreviewResponse(BaseModel):
     title: str
     meet_at: datetime
     target_place_name: str
-    penalty_type: str
+    penalty_type: PenaltyType
     penalty_summary: str
     radar_start_summary: str
     status: str
@@ -137,7 +141,7 @@ class TargetPlace(BaseModel):
 class PenaltyInfo(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    type: str
+    type: PenaltyType
     content: Optional[str]
     fine_per_minute: int
 

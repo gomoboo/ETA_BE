@@ -51,6 +51,13 @@ def test_preview_summaries_for_fee_and_custom_radar(client, onboard, create_appo
     assert data["radarStartSummary"] == "약속 1시간 30분 전부터 위치 공유 시작"
 
 
+def test_preview_summary_for_none_penalty(client, onboard, create_appointment):
+    onboard("host")
+    code = create_appointment("host", penaltyType="NONE", penaltyContent=None, finePerMinute=0)["inviteCode"]
+    data = preview(client, code).json()["data"]
+    assert (data["penaltyType"], data["penaltySummary"]) == ("NONE", "지각 규칙 없음")
+
+
 def test_preview_code_is_case_insensitive(client, appointment):
     assert preview(client, appointment["inviteCode"].lower()).status_code == 200
 

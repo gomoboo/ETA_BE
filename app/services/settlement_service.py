@@ -110,6 +110,8 @@ def _build_judgment_text(defendant: Participant, late_minutes: int, ignored_poke
 def _build_final_penalty(appointment: Appointment, fine_amount: int) -> str:
     if appointment.penalty_type == PenaltyType.FEE.value:
         return f"지각비 {fine_amount:,}원 납부"
+    if appointment.penalty_type == PenaltyType.NONE.value:
+        return "지각 규칙 없음"
     return appointment.penalty_content or ""
 
 
