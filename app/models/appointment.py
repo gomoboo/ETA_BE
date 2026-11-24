@@ -18,6 +18,7 @@ class RadarStartType(str, enum.Enum):
     CUSTOM = "CUSTOM"
 
 class PenaltyType(str, enum.Enum):
+    NONE = "NONE"        # 지각 규칙 없음 (벌칙/지각비 없음)
     PENALTY = "PENALTY"  # 특정 벌칙 문구 (예: "커피 쏘기")
     FEE = "FEE"          # 분당 지각비 누적 (예: 분당 1,000원)
 
@@ -44,7 +45,7 @@ class Appointment(Base):
     radar_start_at = Column(DateTime, nullable=False, comment="계산된 실제 위치 공유(레이더) 시작 시각")
 
     # 벌칙 설정
-    penalty_type = Column(String(20), nullable=False, default="PENALTY", comment="벌칙 유형 (PENALTY/FEE)")
+    penalty_type = Column(String(20), nullable=False, default="PENALTY", comment="벌칙 유형 (NONE/PENALTY/FEE)")
     penalty_content = Column(String(150), nullable=True, comment="벌칙 내용 문구 (예: 오늘 커피 쏘기)")
     fine_per_minute = Column(Integer, nullable=False, default=0, comment="분당 지각 벌금 (원)")
 

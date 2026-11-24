@@ -129,6 +129,16 @@ def test_late_participant_shows_elapsed_time_and_accrued_fine(client, room):
         assert me["currentAccruedFine"] == 5000
 
 
+def test_late_participant_with_none_penalty_has_zero_accrued_fine(client, room):
+    appointment_id, pids = room(meet_in_minutes=-5, penaltyType="NONE", finePerMinute=0, penaltyContent=None)
+    with connect(client, appointment_id, pids["u2"], "u2") as ws:
+        ws.send_json(location(FAR_2KM, speed=10))
+        me = ws.receive_json()["participants"][0]
+        assert me["movementState"] == "LATE"
+        assert 300 <= me["lateElapsedSeconds"] < 310
+        assert me["currentAccruedFine"] == 0
+
+
 @pytest.mark.parametrize("message, expected_code", [
     ("not json", "INVALID_INPUT"),
     ({"type": "unknown:event"}, "INVALID_INPUT"),

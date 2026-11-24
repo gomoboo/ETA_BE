@@ -119,6 +119,35 @@ def test_penalty_settlement_when_all_arrived_counts_ignored_pokes(client, db, se
     assert w["finalPenalty"] == "커피 쏘기"
 
 
+def test_none_penalty_settlement_and_warrants(client, db, setup):
+    appointment_id, meet_at = setup(61, penaltyType="NONE", penaltyContent=None, finePerMinute=0)
+    arrive(db, appointment_id, "host", meet_at - timedelta(minutes=2), "EARLY")
+    arrive(db, appointment_id, "u2", meet_at + timedelta(minutes=7), "LATE")
+
+    data = settlement(client, appointment_id).json()["data"]
+
+    assert data["totalFineAmount"] == 0
+    assert rows(data) == [
+        ("지민", "EARLY", 0, 0), ("지원", "LATE", 7, 0), ("민수", "NOT_ARRIVED", 60, 0),
+    ]
+    assert db.scalar("select status from appointments where id=?", appointment_id) == "COMPLETED"
+
+    no_show, late = warrants(client, appointment_id)
+    assert (no_show["defendantNickname"], no_show["lateMinutes"], no_show["finalPenalty"]) == ("민수", 60, "지각 규칙 없음")
+    assert (late["defendantNickname"], late["lateMinutes"], late["finalPenalty"]) == ("지원", 7, "지각 규칙 없음")
+
+
+def test_none_penalty_no_warrant_when_everyone_on_time(client, db, setup):
+    appointment_id, meet_at = setup(5, penaltyType="NONE", penaltyContent=None, finePerMinute=0)
+    for guest_uuid in ("host", "u2", "u3"):
+        arrive(db, appointment_id, guest_uuid, meet_at, "ON_TIME")
+
+    data = settlement(client, appointment_id).json()["data"]
+    assert data["totalFineAmount"] == 0
+    response = warrant(client, appointment_id)
+    assert (response.status_code, response.json()["code"]) == (404, "WARRANT_NOT_FOUND")
+
+
 def test_no_warrant_when_everyone_on_time(client, db, setup):
     appointment_id, meet_at = setup(5)
     for guest_uuid in ("host", "u2", "u3"):
