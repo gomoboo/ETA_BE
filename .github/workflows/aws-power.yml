@@ -1,4 +1,5 @@
 name: AWS server power
+run-name: "AWS server power [${{ github.event_name == 'schedule' && 'schedule: stop' || inputs.action }}]"
 on:
   workflow_dispatch:
     inputs:
